@@ -1,9 +1,10 @@
 # Installation
 
+[Make sure you download Julia 1.6](https://julialang.org/downloads/) (or higher) and install for your system.
+
 1. Download files for the workshop.
-2. [Download Julia 1.6](https://julialang.org/downloads/) (or higher) and install for your system.
-3. Start the Julia REPL.
-4. Run the following script to download and setup extra packages:
+2. Start the Julia REPL.
+3. Run the following script to download and setup extra packages:
 ```julia
 workshop_folder = "path/to/workshop/folder" # CHANGE THIS
 cd(workshop_folder)
