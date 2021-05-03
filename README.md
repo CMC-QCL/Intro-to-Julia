@@ -8,7 +8,7 @@
 workshop_folder = "path/to/workshop/folder" # CHANGE THIS
 cd(workshop_folder)
 using Pkg           # alternative: use ] for pkg mode
-Pkg.activate()
+Pkg.activate(".")
 Pkg.resolve()
 Pkg.instantiate()
 ```
