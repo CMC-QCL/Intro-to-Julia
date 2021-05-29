@@ -1,0 +1,1046 @@
+# Introduction to Julia: Part II
+
+
+# Agenda
+
+1. Project: Writing a Root Finding Program
+    - Overview of Newton's Method
+    - Handling Derivatives
+    - Adding Visual Feedback
+2. Additional Topics
+    - Broadcasting
+    - More on Types, Immutability, Type Stability
+    - More on Function Arguments and Methods
+    - Multiple Dispatch
+
+# Projects
+
+### Newtons' Method
+
+Newton's method, also known as the Newton-Raphsons method, is an *iterative* technique that computes *roots* of a given function by exploiting information about its shape.
+A root of $f$, or a zero of $f$, is simply a value $x$ such that $f(x) = 0$.
+Given a function $f$ with derivative $f^\prime$, the algorithm can be summarized succintly as
+$$
+\underset{\text{next value in sequence}}{x_{k+1}}
+=
+\underset{\text{current value in sequence}}{x_{k}}
+-
+\underset{\text{Newton direction}}{\frac{ f(x_{k}) }{ f^\prime(x_{k}) }}.
+$$
+Starting from some initial guess for the root, $x_{0}$, one applies the rule above several times until the procedure converges to some specified tolerance level.
+
+
+```julia
+function newton(f, df, x0; niters::Int=100, tol::Real=1e-2)
+    # initialize
+    f_init  = f(x0)                      # initial value for function values, f(x_0)
+    df_init = df(x0)                     # initial value for derivative values, f'(x_0)
+    f_prev  = typemax(f_init)            # previous function value, f(x_k)
+    f_cur   = f_init                     # current function value, f(x_k+1)
+    df_prev = typemax(f_init)            # previous function value, f'(x_k)
+    df_cur  = df_init                    # current function value, f'(x_k+1)
+    T = typeof(one(f_cur) / one(f_prev)) # infer common type
+    x = convert(T, x0)                   # current iterate
+    converged  = false                   # indicates whether we have achieved required tolerance
+    iterations = 0                       # track the number of iterations taken
+
+    for iter in 1:niters
+        # iterate
+        x_prev = x
+        x = x - f_cur / df_cur
+
+        # update state
+        f_prev  = f_cur
+        df_prev = df_cur
+        f_cur   = f(x)
+        df_cur  = df(x)
+
+        # check convergence
+        converged = abs(f_cur - f_prev) < tol * (f_prev + 1)
+        iterations += 1
+
+        converged && break
+    end
+
+    return (x, iterations, converged)
+end
+```
+
+
+```julia
+g(x) = x^2
+dg(x) = 2*x
+newton(g, dg, 4.0, tol=1e-16)
+```
+
+### Handling Derivatives
+
+But what if you don't know all the calculus rules, or your function simply has a derivative that is hard to write down?
+
+Fortunately, there are a number of techniques to
+- compute derivatives exactly (automatic differentation),
+- derive symbolic expressions (symbolic differentiation), and
+- approximate derivatives numerically (finite differences).
+
+
+```julia
+f(x) = tan(x)^2
+```
+
+#### Exact derivatives with ForwardDiff.jl
+
+
+```julia
+using ForwardDiff
+```
+
+
+```julia
+fderiv1(x) = ForwardDiff.derivative(f, x)
+```
+
+
+```julia
+f(2)
+```
+
+
+```julia
+fderiv1(2)
+```
+
+
+```julia
+xs = range(-1, 1, step=1e-2)
+plot(xs, [f, fderiv1],
+    label=["f(x)" "f'(x)"],
+    legend=:outerright,
+    linewidth=3,
+)
+```
+
+#### Approximate derivatives with FiniteDifferences.jl
+
+
+```julia
+using FiniteDifferences
+```
+
+
+```julia
+fderiv2(x) = FiniteDifferences.central_fdm(2, 1)(f, x)
+```
+
+
+```julia
+f(2)
+```
+
+
+```julia
+fderiv2(2)
+```
+
+
+```julia
+xs = range(-1, 1, step=1e-2)
+plot(xs, [f, fderiv2],
+    label=["f(x)" "f'(x)"],
+    legend=:outerright,
+    linewidth=3,
+)
+```
+
+#### Automatic Differenations vs Finite Differences
+
+
+```julia
+abs(fderiv1(2) - fderiv2(2))
+```
+
+### Exercise: Write a function that compares forward mode AD with central finite differences.
+
+#### Inputs:
+- A function, call it `f`.
+- A list of values, `xvalues`, at which to compare the two methods.
+
+#### Outputs:
+
+A single `DataFrame` with the following columns:
+
+- `x`, which denotes the value at which to evalute the requested quantities.
+- `f`, which represents the function value at a given point `x`.
+- `FAD`, the value of the derivative based on ForwardDiff.jl.
+- `CFD`, the value of the derivative based on the central differences method in FiniteDifferences.jl.
+- `diff`, the absolute difference between the two methods.
+
+**Bonus**
+
+- Sort the data in ascending order based on the `x` column.
+- Avoid the `push!` operation in the given `for` loop.
+- Avoid writing an explicit `for` loop.
+
+
+```julia
+function compare_derivatives(f, xvalues)
+    # 1. Create objects that represent derivatives in ForwardDiff.jl and FiniteDifferences.jl.
+    fp_FAD = x -> ForwardDiff.derivative(f, x)
+    fp_CFD = x -> FiniteDifferences.central_fdm(2, 1)(f, x)
+    
+    # 2. Create objects to store different quantities.
+    val_func = Float64[]
+    val_FAD  = Float64[] # Your code goes here
+    val_CFD  = Float64[] # Hint: What data types are useful for representing lists or sequences?
+    val_diff = Float64[]
+    
+    # 3. Compute the requested quantities for the summary.
+    for x in xvalues
+        push!(val_func, f(x))
+        push!(val_FAD, fp_FAD(x)) # Your code goes here.
+        push!(val_CFD, fp_CFD(x))
+        push!(val_diff, abs(fp_FAD(x) - fp_CFD(x)))
+    end
+        
+    # 4. Put everything into a DataFrame.
+    df = DataFrame(x=xvalues, f=val_func, FAD=val_FAD, CFD=val_CFD, diff=val_diff) # Your code goes here.
+    
+    # 5. Return the DataFrame object.
+    return df # Your code goes here.
+end
+```
+
+
+```julia
+test_func1(x) = x^2
+xvalues = randn(5)
+
+compare_derivatives(test_func1, xvalues)
+```
+
+
+```julia
+test_func2(x) = sin(x) / x
+xvalues = [k*π/8 for k in 1:7]
+
+compare_derivatives(test_func2, xvalues)
+```
+
+### Adding Visual Feedback
+
+Now let's add a way to track progress in Newton's method.
+The easiest way to do this would be to print a few values using `print` or `println`.
+Here we will try to make our program modular by adding a step in the program that delegates the logging functionality to some other tiny program.
+We will do this using what is known as a *function callback* -- a function passed to our program that will be called at some point using data from the Newton program.
+
+In our code, we will add an argument, `cb`, which will be a *variable bound to a particular function*.
+The underlying function will accept three arguments; that is, calling it will look like:
+```julia
+cb(f, df, info)
+```
+where `f` is the function whose root we are interested in, `df` is the derivative of `f`, and `info` is an object that contains extra information.
+In this case, we will use a `NamedTuple` to store information about the state of the algorithm (see the code below).
+
+
+```julia
+function newton(f, df, x0; niters::Int=100, tol::Real=1e-2, cb::Function=DEFAULT_CB) # note the extra argument
+    # initialize
+    f_init  = f(x0)                      # initial value for function values, f(x_0)
+    df_init = df(x0)                     # initial value for derivative values, f'(x_0)
+    f_prev  = typemax(f_init)            # previous function value, f(x_k)
+    f_cur   = f_init                     # current function value, f(x_k+1)
+    df_prev = typemax(f_init)            # previous function value, f'(x_k)
+    df_cur  = df_init                    # current function value, f'(x_k+1)
+    T = typeof(one(f_cur) / one(f_prev)) # infer common type
+    x = convert(T, x0)                   # current iterate
+    converged  = false                   # indicates whether we have achieved required tolerance
+    iterations = 0                       # track the number of iterations taken
+
+    for iter in 1:niters
+        # iterate
+        x_prev = x
+        x = x - f_cur / df_cur
+
+        # update state
+        f_prev  = f_cur
+        df_prev = df_cur
+        f_cur   = f(x)
+        df_cur  = df(x)
+
+        # package information into a NamedTuple?
+        info = (
+                iter=iter,
+                x_cur=x,
+                x_prev=x_prev,
+                f_cur=f_cur,
+                f_prev=f_prev,
+                df_cur=df_cur,
+                df_prev=df_prev,
+        )
+        
+        # execute the callback
+        cb(f, df, info)
+
+        # check convergence
+        converged = abs(f_cur - f_prev) < tol
+        iterations += 1
+
+        converged && break
+    end
+
+    return (x, iterations, converged)
+end
+
+# implement a default behavior for callback
+DEFAULT_CB(f, df, info) = nothing
+```
+
+Check that everything still works:
+
+
+```julia
+newton(g, dg, 4.0, tol=1e-8)
+```
+
+Now let's write a program that displays
+
+1. the current iteration number,
+2. the current estimate for the root, `x`, and
+3. the current function value, `f(x)`.
+
+We will use the `Printf` module to help us format our strings.
+To understand the formatting, note that:
+
+- `\t`: denotes a *tab character*.
+- `\n`: denotes a *newline character*.
+- `%3d`: denotes a number with 3 digits.
+- `.8f`: denotes a floating point number has 8 digits after the decimal.
+
+
+```julia
+using Printf
+```
+
+
+```julia
+function print_cb(f, df, info)
+    x, fx, iter = info.x_cur, info.f_cur, info.iter
+
+    # add a header for the first iteration
+    iter == 1 && println("iter\tx\t\tf(x)")
+
+    # print iteration, x value, and f(x) value
+    @printf "%3d\t%.8f\t%.8f\n" iter x fx
+
+    return nothing
+end
+```
+
+
+```julia
+newton(g, dg, 4.0, tol=1e-8, cb=print_cb)
+```
+
+Our printing callback works as expected, but doing any analysis with the information printed out is cumbersome: you have to copy the information from your screen.
+
+Next, we will implement a callback that actually stores the information for later use within Julia.
+In order to avoid modifying our Newton's method program any further, we will use a slightly more advanced concept called a *closure*.
+Specifically, we want to implement a function that stores information inside two arrays, but we need those arrays to be scoped within the calling function.
+
+
+```julia
+# define the type, which is defined as a subtype of function so that it behaves like a function
+struct MyLoggingCB{T} <: Function
+    xvals::Vector{T} # the first field will store the x values
+    fvals::Vector{T} # the second field will store the f(x) values
+end
+
+# provide a constructor to initialize both fields with empty arrays.
+MyLoggingCB{T}() where T = MyLoggingCB(T[], T[])
+
+# implement the desired behavior
+function (cb::MyLoggingCB)(f, df, info)
+    # flush if this is the first call
+    if info.iter == 1
+        empty!(cb.xvals)
+        empty!(cb.fvals)
+    end
+
+    # log the data
+    push!(cb.xvals, info.x_cur)
+    push!(cb.fvals, info.f_cur)
+
+    return nothing
+end
+```
+
+
+```julia
+mycb = MyLoggingCB{Float64}()
+newton(g, dg, 4.0, tol=1e-8, cb=mycb)
+```
+
+
+```julia
+xmin, xmax = extrema(mycb.xvals)
+xs = range(xmin, xmax, length=1000)
+
+plot(xs, g, lw=3, label="g(x)", legend=:outerright)
+plot!(mycb.xvals, mycb.fvals, xlab="x", ylab="g(x)", label="path", arrow=true, lw=3, linestyle=:dash)
+```
+
+
+```julia
+# using Pkg; Pkg.add("Plots")
+using Plots
+
+struct MyPlottingCB{T} <: Function
+    log::MyLoggingCB{T}
+end
+
+MyPlottingCB{T}() where T = MyPlottingCB{T}(MyLoggingCB{T}())
+
+function (cb::MyPlottingCB)(f, df, info)
+    # first log the new data
+    cb.log(f, df, info)
+
+    # now show a plot
+    fig = plot(1:length(cb.log.fvals), cb.log.fvals, xlab="iteration", ylab="f(x)", lw=3)
+    scatter!(1:length(cb.log.fvals), cb.log.fvals, legend=false, lw=0)
+    
+    # sleep a little so we can see that it happens as the algorithm progresses
+    sleep(0.5)
+
+    # make sure the figure is displayed
+    display(fig)
+
+    return nothing
+end
+```
+
+
+```julia
+mycb = MyPlottingCB{Float64}()
+newton(g, dg, 4.0, tol=1e-8, cb=mycb)
+```
+
+# Additional Topics
+
+### Broadcasting
+
+The `.` symbol has a special meaning in Julia in that it is reserved for two operations: accessing fields of a type, or *broadcasting*.
+Roughly speaking, *broadcasting* allows you to apply functions to elements of a collection individually using a concise syntax.
+
+For example we can do elementwise-multiplication:
+
+
+```julia
+x = [1, 2, 3]
+y = [12, 6, 4]
+
+x .* y
+```
+
+This works for *any* function, not just operators:
+
+
+```julia
+function foo(x)
+    return x * sqrt(2)
+end
+```
+
+
+```julia
+foo.(x)
+```
+
+Julia will try to reason about functions supporting multiple arguments where possible:
+
+
+```julia
+function bar(x, y)
+    return x + sqrt(y)
+end
+```
+
+
+```julia
+bar.(x, y)
+```
+
+
+```julia
+z = 4 * ones(5)
+```
+
+
+```julia
+bar.(x, z)
+```
+
+Adding `.` everywhere can become tedious in a complicated expression, so Julia provides a special `@.` *macro* to automatically add broadasting to an expression:
+
+
+```julia
+z = rand(3)
+```
+
+
+```julia
+@. x * y + z
+```
+
+
+```julia
+w = zeros(3)
+
+for i in eachindex(w) # eachindex(w) is preferred style over 1:length(w)
+    w[i] = x[i] * y[i] + z[i] # equivalent version
+end
+
+w
+```
+
+### Macros to know about
+
+*Macros* in Julia are functions that transform Julia code into other Julia code.
+This is possible in part because Julia is written in Julia itself, using `Symbol` and `Expr` objects.
+For example:
+
+
+```julia
+ex = :(1 + 3) # the : symbol can be used to define a symbol or expression
+```
+
+```julia
+typeof(ex)
+```
+
+```julia
+ex.head
+```
+
+```julia
+ex.args
+```
+
+```julia
+eval(ex) # evaluate the expression; you almost never have to use something like this in your code
+```
+
+The `@time` macro is useful for timing parts of your code.
+To undrestand what we mean by code transformation, the `@time` macro is roughly equivalent to
+
+```julia
+t1 = time() # get time in seconds
+sleep(0.1) # do something
+t2 = time() # get new time in seconds
+(t2 - t1) # get time elapsed
+```
+
+```julia
+@time sleep(0.1); # includes information about memory allocation
+```
+
+Macros are quite an advanced topic, but here we will simply mention a few macros and describe their use:
+
+1. `@time`: time a line of code (can be used on functions); see also [BenchmarkTools.jl](https://github.com/JuliaCI/BenchmarkTools.jl) for more rigorous benchmarking.
+2. `@show`: force displaying of a variable or expression
+3. `@inbounds`: turn off bounds-checking on arrays within an expression (use with extreme care!)
+4. `@code_warntype`: useful for checking Julia code for type stability
+5. `@.`: Add `.` to functions in an expression to induce broadcasting
+6. `@assert`: Check that an expression evaluates to true; otherwise throw an error.
+
+### A little more on types
+
+Julia has a flexible [type system](https://docs.julialang.org/en/v1/manual/types/).
+As we've seen, a "type" roughly translates to "class" in object oriented programming (OOP).
+In contrast to OOP, however, Julia types have *very* strict notion of inheritance: you can't extend concrete types.
+Here we won't discuss how polymorphism or design work in Julia, but rather take a closer look at the anatomy of types.
+
+There are three main classes of types to be aware of as you start with the language:
+
+1. Composite Types: Types that combine other data types.
+2. Parametric Types: Types that define a *family* of types, parameterized by some variables.
+3. Abstract Types: These are just "nodes" in a hierarchy. You can define functions with them or use them in type annotations, but you cannot make instances.
+For example, an `Int` is a subtype of `Real` so it sits somewhere in a hierarchy including both types.
+
+Importantly, types can be defined at any point in time, but their structure cannot be changed once defined.
+This means:
+
+- You can edit functions that use a particular type, but not change what fields are part of the type after it's been defined.
+- You can update a type's constructors. For our purposes, a constructor is merely a function that creates an instance of a type.
+
+In the following code, note that `<name>::<type>` is a *type annotation* which declares that a particular variable has a certain type.
+Type annotations can be used anywhere, including
+
+- function signatures, which limit the type of arguments that can go into the function, and
+- code blocks/function bodies, which enforce that an object must have a certain type.
+
+
+```julia
+struct Point2D # define an (immutable) type named Point2D
+    x::Float64 # has a field x which is a Float64
+    y::Float64 # has a field y which is a Float64
+end
+```
+
+```julia
+Point2D(1.0, 0.0) # Julia automatically defines a constructor for you
+```
+
+```julia
+struct ParPoint2D{T <: Real} # define a type family where type T must be a subtype Real number
+    x::T # has a field x, which has type T
+    y::T # has a field y, which is ALSO type T
+end
+```
+
+```julia
+ParPoint2D(0,0) # type parameter automatically inferred
+```
+
+```julia
+ParPoint2D{Float64}(0, 0) # note the automatic conversion
+```
+
+We can define a no-argument constructor that defaults to the origin.
+Note that here we must specify the type parameter using `{T}` and state that `T` is a free parameter using `where`.
+Writing `where T` roughly translates to `where T <: Any` but we could also restrict `where T <: Real` if we want. 
+
+```julia
+ParPoint2D{T}() where T = ParPoint2D{T}(zero(T), zero(T)).
+```
+
+Note that this generic version works for many data types:
+
+```julia
+@show ParPoint2D{Float64}()
+@show ParPoint2D{Int}()
+```
+
+The alternative would be to write a no-argument constructor for every possible type value for `T`; e.g. `ParPoint{Float64} = ParPoint(0.0, 0.0)` which is tedious.
+The generic version is guaranteed to work for any subtype of `Real`, *even types that did not exist when we implemented our type*.
+
+One of the benefits of the Julia language is the ability to overload standard functions to take advantage of composition.
+For example, it's possible to define a notion of addition with points by overloading `+`:
+
+```julia
+import Base: + # existing functions must imported explicitly in order to overload them 
+
+function Base.:+(A::ParPoint2D, B::ParPoint2D) # we could specify type parameters but there's no need
+    return ParPoint2D(A.x + B.x, A.y + B.y)
+end
+
+ParPoint2D(1,1) + ParPoint2D(2,1)
+```
+
+Now anything that relies on `+` "just works":
+
+```julia
+list = [ParPoint2D(1,1), ParPoint2D(2,1), ParPoint2D(3,0)]
+sum(list)
+```
+
+### (Im)mutability and function name conventions
+
+Every type in Julia is either *mutable* or *immutable*.
+A type is said to be *mutable* if you are allowed to change its contents.
+In contrast, *immutable* objects cannot have their contents changed.
+
+For example, if we create a variable that stores the number `1` we can bind the variable to a new value *but its contents do not change* because it is immutable.
+Let's illustrate this by writing a wrapper type for `Int`:
+
+
+```julia
+struct MyInt # structs are immutable
+    value::Int
+end
+```
+
+
+```julia
+x = MyInt(1)
+```
+
+
+```julia
+x.value = 2
+```
+
+
+```julia
+mutable struct MutableInt
+    value::Int
+end
+```
+
+
+```julia
+y = MutableInt(1)
+```
+
+
+```julia
+y.value = 2
+```
+
+
+```julia
+y
+```
+
+Given this behavior, you may naturally wonder how objects may or may not change if one attempts to mutate them inside a function.
+
+
+```julia
+a = [1.0, 2, 3]
+```
+
+
+```julia
+function mutate_second_element(x)
+    x[2] = sqrt(2) # this is MUTATION! it is shorthand for setfield!(x, new_value, index)
+end
+```
+
+
+```julia
+mutate_second_element(a)
+```
+
+
+```julia
+a
+```
+
+
+```julia
+@which a[2] = sqrt(2)
+```
+
+
+```julia
+function assign_and_mutate_second_element(x)
+    y = x # this is ASSIGNMENT
+    y[2] = sqrt(3) # this is MUTATION
+end
+```
+
+
+```julia
+assign_and_mutate_second_element(a)
+```
+
+
+```julia
+a
+```
+
+To understand this example, remember that `=` by itself simply *binds* a value to a particular symbol.
+So, `y = x` simply means that the data attached to `x` is now also attached to `y`; no new copy is created.
+Mutating the data attached to `y` is equivalent to mutating `x`.
+
+We can test this with another example:
+
+
+```julia
+function copy_and_mutate_second_element(x)
+    y = copy(x) # assign y a copy of the data in x
+    y[2] = sqrt(17)
+end
+```
+
+
+```julia
+copy_and_mutate_second_element(a)
+```
+
+
+```julia
+a
+```
+
+**To help programmers understand that objects will be mutated after calling a particular function, we use the convention of adding `!` to the end of a mutating function**. This lets users know that a function will mutate some arguments. Usually, we put the mutated arguments on the left of the function signature.
+
+In fact, it is a common pattern in Julia to separate a function into allocating and non-allocating versions:
+
+
+```julia
+function compute_partial_sums(x)
+    # create an Array with the same shape as x, but filled with zero(eltype(x)). 
+    partial = zero(x)
+    
+    # do the actual work, storing the result in partial
+    # we return whatever this function evaluates to
+    compute_partial_sums!(partial, x)
+end
+```
+
+
+```julia
+function compute_partial_sums!(partial, x) # use convention; has ! and mutated argument is the first
+    for i in eachindex(x)
+        prev = i > 1 ? partial[i-1] : zero(eltype(x))
+        partial[i] = prev + x[i]
+    end
+    return partial
+end
+```
+
+
+```julia
+x = [1, 1, 1, 1]
+```
+
+
+```julia
+compute_partial_sums(x)
+```
+
+This is essentially what the `cumsum` (cumulative sum) function does:
+
+
+```julia
+cumsum(x)
+```
+
+
+```julia
+partial = zero(x)
+cumsum!(partial, x)
+partial
+```
+
+### Type stability
+
+A block of code, such as a function, is said to be *type-stable* if Julia is able to determine the types of all variables at compile time.
+Having complete type information allows Julia's compiler to automatically generate efficient code that runs on your machine.
+You can investigate type stability using the `@code_warntype` macro, which will highlight potential type instability in red (serious) and yellow (okay).
+
+
+```julia
+function silly_example(x)
+    if x < 10
+        return "ten"
+    else
+        return x
+    end
+end
+```
+
+```julia
+silly_example(1)
+```
+
+```julia
+silly_example(12.3)
+```
+
+```julia
+@code_warntype silly_example(1)
+```
+
+Here the annotation with `Union{Int64,String}` means that the return value is either a `Int64` or a `String`, which is called a *type union*.
+Julia handles minor type stability violations by introducing type unions to limit the possible space of return types.
+In the *worst case* the return type will be `Any`, the catch-all when Julia is unable to infer any type information.
+
+Let's look at a more realistic example.
+Here we have a function that computes the sum of an array:
+
+```julia
+function mysum(x)
+    value = 0 # initialize
+    for i in eachindex(x) # iterate over the indices in x
+        value = value + x[i] # sum
+    end
+    return value
+end
+```
+
+```julia
+x = [1.0, 2.0, 3.0]
+mysum(x)
+```
+
+```julia
+@code_warntype mysum(x)
+```
+
+This means the return type for `value` is either a `Int64` or a `Float64`.
+The reason is that `value = 0` is initially an `Int64`. Then:
+- if the `for` loop runs, `value = value + x[1]` where `x[1]::Float64` so `value` is promoted to a `Float64`, or
+- if the `for` loop never runs, then `value = 0` which is an `Int64`.
+This seems like a bad consequence of Julia's flexible type system.
+However, it has a very easy fix:
+
+```julia
+function mysum(x)
+    value = zero(eltype(x)) # set value to the zero of the same type as elements in x
+    for i in eachindex(x)
+        value = value + x[i]
+    end
+    return value
+end
+```
+
+```julia
+x = Int64[1, 2, 3]
+@code_warntype mysum(x)
+```
+
+```julia
+x = Float32[1, 2, 3]
+@code_warntype mysum(x)
+```
+
+The type instability is gone!
+Now we have a generic, type-stable function that preserves types after the sum reduction.
+
+### Functions vs Methods
+
+A *function* in Julia is essentially the symbol bound to a particular "action".
+A *method* is a particular version or implementation of that action.
+
+For example, the `sqrt` function will behave differently depending on the input type.
+
+
+```julia
+?sqrt
+```
+
+Julia lets us look up *methods* for a particular *function* using `methods`:
+
+
+```julia
+methods(sqrt)
+```
+
+This table shows us that the `sqrt` function has 19 different methods, each specializing on different input types.
+
+
+```julia
+sqrt(-1.0)
+```
+
+
+```julia
+sqrt(Complex(-1.0))
+```
+
+### Optional arguments in functions
+
+It is possible to define functions with optional arguments.
+There are two kinds to consider:
+
+* *Positional arguments* occur at the end of a function signature in a specific order and have default values. If the optional arguments are not specified, the default values are used.
+* *Keyword arguments* begin after a semicolon `;` in a function signature. Changing the default values requires the caller to name the arguments and assign non-default values.
+
+You can specify as many optional arguments as needed, and can mix positional and keyword arguments.
+
+
+```julia
+function add_number(a, b=1)
+    return a + b
+end
+```
+
+
+```julia
+function also_add_number(a; b=1)
+    return a + b
+end
+```
+
+
+```julia
+add_number(2) # don't specify the positional argument b
+```
+
+
+```julia
+add_number(2, b=2) # this fails
+```
+
+
+```julia
+add_number(2, 2) # specify b
+```
+
+
+```julia
+also_add_number(2) # don't specify the keyword argument b
+```
+
+
+```julia
+also_add_number(2, 2) # this fails
+```
+
+
+```julia
+also_add_number(2, b=2) # the keyword argument must be invoked explicitly
+```
+
+
+### Duck Typing and Multiple Dispatch
+
+In all our functions so far we have not specified the *types* of arguments that go into the function.
+Yet, Julia is always aware of the types of arguments and variables within a function in spite of this fact.
+This is known as *duck typing* and is actually a nice feature common to dynamic languages because it allows functions to be written in a generic fashion.
+
+In many other programming languages, particularly those supporting object oriented design as it is commonly understood, there is the notion of *dispatching* to the most specific method in order to fulfill a function call.
+The `sqrt` example with `Float64` and `Complex{Float64}` are examples of this.
+
+However, this example involves pattern matching on just one argument. What's the "multiple" in "multiple dispatch" and how is it related to duck typing in Julia?
+
+To understand this, consider the following example from [Ole Kröger](https://opensourc.es/blog/basics-multiple-dispatch/) ([adapted from an example by Julia co-creator Stefan Karpinski](https://www.youtube.com/watch?v=kc9HwsxE1OY)):
+
+
+```julia
+abstract type Animal end
+
+# define a Lizard type with a name field
+struct Lizard <: Animal
+    name :: String
+end
+
+# define a Rabbit type with a name field
+struct Rabbit <: Animal
+    name :: String
+end
+
+# Define the race function with 3 methods: 2 specific ones and one generic fallback
+race(l::Lizard, r::Rabbit) = "$(l.name) wins in wall climbing."
+race(r::Rabbit, l::Lizard) = "$(r.name) wins in a normal race."
+race(a::T, b::T) where T <: Animal = "$(a.name) and $(b.name) run forever."
+
+# Define a meet function that calls the race function.
+function meet(a::Animal, b::Animal) 
+    println("$(a.name) meets $(b.name) and they race!")
+    println("Outcome: $(race(a,b))")
+end
+
+# Try it out with our two Animal types
+bayi = Lizard("Bayi")
+sally = Rabbit("Sally")
+meet(bayi, sally)  # calls the first race method
+meet(sally, bayi)  # calls the second race method
+meet(sally, sally) # calls the generic fallback
+```
+
+Multiple dispatch lets Julia and its compiler *select the most specific method **based on the runtime types**.*
+To someone coming from C++, this example makes multiple dispatch look just like function overloading.
+
+However, implementing this code in C++ and running it reveals that C++ will always call the third, generic fallback where two animals run forever! This is because while C++ can choose a specific method, it is limited to the type information **available at compile time**. As such, adding the third method effectively erases methods one and two.
+
+The workaround in C++ would be to make the `race` function specific to the abstract/superclass `Animal` class; i.e. we need to be able to write `bayi.race(sally)` and `sally.race(bayi)`.
+This seems reasonable, but you will run into trouble as soon as you need to make an `Animal` race a `Human` because now both classes must have `race` as part of their definitions, but you may not have designed the classes with this use case in mind!
+
+*In object-oriented languages, methods belong to class functions not just functions in general.*
+
+In contrast, in Julia this would be simply a matter of adding `race(l::Human, r::Animal)` to handle cases as needed.
+Thus, Julia rewards you for writing "weakly" or duck typed functions by letting you handle specific cases with different input types only as needed, without having to completely redesign your code.
+**In fact, the preferred style in Julia is to avoid adding type annotations in your code unless absolutely necessary**.
+
+These two points make code reuse much more probable, and is the "magic" that lets packages build lots of nice, unexpected features into them. (Feel free to ask for examples!)
