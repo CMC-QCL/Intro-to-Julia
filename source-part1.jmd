@@ -8,13 +8,17 @@
     - Tools and Getting Around
     - Literals, Variables, and Functions
     - Program Control Flow
-    - Collections
-    - Modules and Packages: Using Other People's Code
-2. What can you do with the Julia programming language?
+3. Exercises
+4. Using Other People's Code
+    - Standard Library
+    - Registered Packages
+    - Environments
+    - Modules
+5. What can you do with the Julia programming language?
     - Scientific Modelling
     - Fast Linear Algebra
 
-# Learning Goals
+### Learning Goals
 
 After this workshop you should:
 
@@ -58,190 +62,6 @@ This means that if you really need a package implemented in another language, it
 The [JuliaInterop](https://github.com/JuliaInterop) organization has more packages available for other languages.
 
 **Ultimately, the Julia language is (a very useful) tool. You should use whatever makes you productive, and your work reproducible.**
-
-### How does it work?
-
-Credit: Arch D. Robison
-
-|   |   |
-|---|---|
-| <img src="julia_toolchain.png" alt="julia_toolchain.png" width="400"/> | <img src="julia_introspect.png" alt="julia_introspect.png" width="530"/> |
-
-**Big Picture**: Julia's *design* uses a robust type system to pass type information to a compiler that can then generate efficient machine code.
-
-The type system uses *multiple dispatch* to help programmers write generic type-stable code; type-stable code is easy for the compiler to reason about.
-
-On the surface, Julia syntax looks like any other scripting language because it is quite human readable.
-However, Julia code is much more explicit than it appears on the surface.
-
-Dr. Chris Rackauckas has [an excellent page](https://ucidatascienceinitiative.github.io/IntroToJulia/Html/JuliaMentalModel) on developing a mental model for Julia:
-
-> **A Mental Model for Julia: Talking to a Scientist**
-> * When you're talking, everything looks general. However, you really mean very specific details determined by context.
-> * You can quickly dig deep into a subject, assuming many rules, theories, and terminology.
-> * Nothing is hidden: if you ever want to hear about every little detail, you can ask.
-> * They will get mad (and throw errors at you) if you begin to be loose with the specific details.
-
-Let's look at an example.
-The following function computes the sum
-$$x_{1} + x{2} + \ldots + x_{m} + y_{1} + y_{2} + \ldots + y_{n}$$
-
-```julia
-function mysum(x, y)
-    s = zero(x[1])
-
-    for i in eachindex(x)
-        s = s + x[i] # sum up elements of x
-    end
-
-    for j in eachindex(y)
-        s += y[j]    # sum up elements of y
-    end
-
-    return s
-end
-```
-
-First check that the function works as intended.
-```julia
-x = rand(5) # random vector with 5 elements [x_1, x_2, ..., x_5]
-y = rand(8)
-mysum(x, y) == sum(x) + sum(y)
-```
-
-It works when the inputs are different collection types; i.e. `Vector` vs `Tuple`.
-```julia
-x = [2, 4, 6] # vector
-y = (1.0, 3.0, 5.0) # tuple
-mysum(x, y) == sum(x) + sum(y)
-```
-
-It works for scalars.
-```julia
-mysum(1, 1) == 1 + 1
-```
-
-It works for vectors of vectors
-```julia
-x = [rand(3), rand(3)]
-y = [rand(3)]
-mysum(x, y) == x[1] + x[2] + y[1]
-```
-
-But it fails here and Julia tells you why
-```julia
-x = [rand(3), rand(3)] # Vector of vectors 
-y = [(1.0, 3.0, 5.0)] # Vector of tuples
-mysum(x, y) == x[1] + x[2] + y[1]
-```
-
-What does Julia do differently in each case?
-You can ask with tools like `@code_warntype` and `@code_llvm` to see for yourself.
-
-```julia
-@code_warntype mysum(1, 1)
-```
-
-```julia
-@code_llvm mysum(1, 1)
-```
-
-```julia
-@code_warntype mysum(rand(3), rand(4))
-```
-
-```julia
-@code_llvm mysum(rand(3), rand(4))
-```
-
-**Takeaway**: You can be verbose or terse with the Julia language, but it's best to be concise.
-
-# What can I do with the Julia programming language?
-
-### Scientific Modeling
-
-**Credit**: [epirecipes](https://github.com/epirecipes/sir-julia/blob/master/markdown/ode/ode.md)
-
-OrdinaryDiffEq.jl is part of the SciML ecosystem.
-See the [organization's website](https://sciml.ai/) for more details.
-DifferentialEquations.jl is the main package with lots of extra features at the cutting edge of scientific machine learning.
-
-The following code implements a [Susceptible-Infected-Removed (SIR) model](https://github.com/epirecipes/sir-julia) for infectious diseases.
-- Infected individuals spread disease through 'contact' with susceptibles.
-- The rate at which individuals are infected is proportional to the proportion of infecteds in a population; it depends on an infection risk per contact, $\beta$, and an average contact rate, $c$.
-- Infecteds recover at a rate $\gamma > 0$, with $1/\gamma$ denoting an average recovery time.
-
-
-```julia
-using OrdinaryDiffEq, Plots
-
-function sir_ode!(du, u, p, t)
-    (S, I, R) = u
-    (β, c, γ) = p
-    N = S+I+R
-    @inbounds begin
-        du[1] = -β*c*I/N*S
-        du[2] = β*c*I/N*S - γ*I
-        du[3] = γ*I
-    end
-    nothing
-end
-
-# Initial conditions
-u0 = [990.0,10.0,0.0]; # S,I.R
-
-# Model parameters
-p = [0.05,10.0,0.25]; # β,c,γ
-
-# Timespan
-δt = 0.1
-tmax = 40.0
-tspan = (0.0,tmax)
-t = 0.0:δt:tmax
-
-# Create ODE problem and solve it
-prob_ode = ODEProblem(sir_ode!, u0, tspan, p)
-sol = solve(prob_ode, Tsit5())
-
-# Plot the solution
-plot(sol, xlabel="time, t", ylabel="population, u(t)", label=["S" "I" "R"], legend=:outerright)
-```
-
-### Fast Linear Algebra
-
-[BLAS](https://en.wikipedia.org/wiki/Basic_Linear_Algebra_Subprograms) and [LAPACK](https://en.wikipedia.org/wiki/LAPACK) are important libraries for carrying out *fast and correct* linear algebra operations on computers.
-There are various implementations written in 'low-level' languages like C or Fortran, sometimes tuned for specific hardware, dating back to 1979.
-
-Developers in Julia are exploring the possibility of implementing linear algebra subroutines within the Julia language.
-The following compares the default BLAS implementation (OpenBLAS) shipped with Julia against [Octavian.jl](https://github.com/JuliaLinearAlgebra/Octavian.jl).
-A more detailed look (with different hardware) can be found [here](https://github.com/JuliaLinearAlgebra/Octavian.jl/issues/24#issuecomment-763704038).
-
-Run a separate Julia process using the `linalg.jl` script.
-It takes in two arguments, # BLAS threads and matrix size. 
-```julia
-run(`/home/alanderos/julia-1.6.1/bin/julia --project=@. linalg.jl 10 1000`)
-```
-
-Run a separate Julia process using the `octavian.jl` script.
-It requires you specify the number of threads (`-t 10`; match to # physical cores) and matrix size (`1000`).
-```julia
-run(`/home/alanderos/julia-1.6.1/bin/julia --project=@. -t 10 octavian.jl 1000`)
-```
-
-```julia
-versioninfo(verbose=true)
-```
-
-**Note**: OpenBLAS may not always be able to detect the correct architecture until it is updated, and so it will default to the next best available subroutines.
-[The codename Prescott dates back to Intel's Pentium 4 from the 00s](https://ark.intel.com/content/www/us/en/ark/products/codename/1791/prescott.html).
-In reality the gap may be closer than reported here.
-
-**Note**: Many programming languages for statistics, data science, or other technical computing use a BLAS implementation like OpenBLAS (R for example).
-
-```julia
-using LinearAlgebra
-BLAS.openblas_get_config()
-```
 
 # Basics
 
@@ -447,6 +267,8 @@ end
 @show c
 ```
 
+**Note**: The `@show` command is a *macro* used to quickly print the value of a variable or expression.
+For example, you can think of `@show val` and shorthand for `println("val = ", val)`.
 
 ```julia
 val = if c < 1 # if statements return the last value in the branch taken
@@ -460,7 +282,7 @@ end
 val
 ```
 
-Keep this in mind as we move on to functions and control flow topics.
+Keep this in mind as we move on to functions and control flow.
 
 ### Functions
 
@@ -469,8 +291,41 @@ These are the nouns in a programming language.
 How do we actually say anything useful?
 We need *functions*, which serve as verbs.
 
-#### The usual [artihmetic operators](https://docs.julialang.org/en/v1/manual/mathematical-operations/#Arithmetic-Operators) (which are functions) are supported in Julia:
+#### Built-in functions
 
+Many useful functions are already implemented in Julia.
+In fact, if there is something you want to do it is often helpful to try looking up `?<verb>` to see if an existing function can solve your task.
+
+##### Printing (note that the character `\n` indicates a newline):
+
+```julia
+print("The value of myvariable is ", myvariable, ".\n")
+print("The value of myothervar is ", myothervar, ".\n")
+```
+
+The same can be achieved with `println`:
+
+
+```julia
+println("The value of myvariable is ", myvariable, ".")
+println("The value of myothervar is ", myothervar, ".")
+```
+
+Multi-line strings, `"""..."""`, interpret whitespace.
+The `$` symbol can be used to interpolate a variable's value into a string.
+More generally, `$(ex)` will interpolate the value of an expression `ex`.
+
+
+```julia
+print(
+"""
+The value of myvariable is $myvariable.
+1 + 1 is $(1 + 1).
+"""
+)
+```
+
+##### The usual [artihmetic operators](https://docs.julialang.org/en/v1/manual/mathematical-operations/#Arithmetic-Operators) are supported in Julia:
 
 ```julia
 1 + 1 # addition
@@ -501,7 +356,7 @@ We need *functions*, which serve as verbs.
 -1 # negative sign
 ```
 
-#### Other [logical operators](https://docs.julialang.org/en/v1/manual/mathematical-operations/#Boolean-Operators) and [comparison operators](https://docs.julialang.org/en/v1/manual/mathematical-operations/#Numeric-Comparisons):
+##### Other [logical operators](https://docs.julialang.org/en/v1/manual/mathematical-operations/#Boolean-Operators) and [comparison operators](https://docs.julialang.org/en/v1/manual/mathematical-operations/#Numeric-Comparisons):
 
 
 ```julia
@@ -513,36 +368,6 @@ We need *functions*, which serve as verbs.
 !(1 ≤ 1) # type `\le` and hit `TAB` to get the ≤ symbol
 ```
 
-#### Printing (note that the character `\n` indicates a newline):
-
-
-```julia
-print("The value of myvariable is ", myvariable, ".\n")
-print("The value of myothervar is ", myothervar, ".\n")
-```
-
-The same can be achieved with `println`:
-
-
-```julia
-println("The value of myvariable is ", myvariable, ".")
-println("The value of myothervar is ", myothervar, ".")
-```
-
-Multi-line strings, `"""..."""`, interpret whitespace.
-The `$` symbol can be used to interpolate a variable's value into a string.
-More generally, `$(ex)` will interpolate the value of an expression `ex`.
-
-
-```julia
-print(
-"""
-The value of myvariable is $myvariable.
-1 + 1 is $(1 + 1).
-"""
-)
-```
-
 **Note:** The terms *operator* and *function* are virtually the same for our purposes.
 The only meaningful distinction from our POV is that *operators* have shorthand names based on punctuation marks whereas *functions* are typically spelled out in several characters.
 Binary operators also support *infix notation* so we can use them just how one typically writes down math but it's also possible to call operators the same way one invokes `println`:
@@ -552,42 +377,9 @@ Binary operators also support *infix notation* so we can use them just how one t
 +(1, 1)
 ```
 
-Notice that `1 + 1` returns `2` as an `Int64` whereas as `4 / 2` returns `2` as a `Float64`.
-We can try a few more examples to see that *addition on two elements of the same type* always returns an answer of that same type (in fact, this is a mathematical property of addition on certain sets).
+#### User-defined functions
 
-What happens when we mix data types?
-
-Julia has a set of promotion rules to determine how to resolve certain operations.
-For example, `1 + 3.2` will return `4.2` as a `Float64`.
-Test this yourself using `typeof`.
-
-
-```julia
-# your code here
-```
-
-This is not the case with division and so we naturally have a few ways to handle it: `/`, `div`, and `//`.
-Check the documentation for these functions.
-
-
-```julia
-# your code here
-```
-
-Julia's type promotion rules make it is so programmers do not waste time casting objects to 'compatible' data types; they are already compatible.
-Importantly, operations with numbers already handle type promotion with reasonable defaults so that standard arithmetic "just works" out of the box.
-
-However, if you ever needed to handle conversions explicitly you can do it with the `convert` function:
-
-
-```julia
-convert(Complex{Float64}, 1.0) # specify the type, then give the object to convert
-```
-
-Many useful functions are already implemented in Julia.
-In fact, if there is something you want to do it is often helpful to try looking up `?<verb>` to see if an existing function can solve your task.
-
-Programming often involves building up many small programs that, ideally, can be composed to write larger more complex programs.
+Programming involves building up many small programs that, ideally, can be composed to write larger more complex programs.
 There are many ways to define a function in Julia.
 For example, consider the function $x \mapsto x + 1$ that takes a number and adds 1 to it:
 
@@ -703,7 +495,8 @@ A few test cases:
 @show quadratic(1.0, 0, -1.0)   # == (-1.0, 1.0); x^2 - 1
 ```
 
-**A note for scientists**:
+#### A note for scientists
+
 Try the following code using your `quadratic` function
 
 ```julia
@@ -738,6 +531,38 @@ Some useful values and functions to know about:
 - `nextfloat`/`prevfloat`: The next/previous representable floating-point number relative to an input.
 
 **Takeaway**: Try to look through documentation to see if a function you want has already been implemented, *especially* for any numerics.
+
+#### What happens when we mix data types?
+
+Notice that `1 + 1` returns `2` as an `Int64` whereas as `4 / 2` returns `2` as a `Float64`.
+We can try a few more examples to see that *addition on two elements of the same type* always returns an answer of that same type (in fact, this is a mathematical property of addition on certain sets).
+
+Julia has a set of promotion rules to determine how to resolve certain operations.
+For example, `1 + 3.2` will return `4.2` as a `Float64`.
+Test this yourself using `typeof`.
+
+
+```julia
+# your code here
+```
+
+This is not the case with division and so we naturally have a few ways to handle it: `/`, `div`, and `//`.
+Check the documentation for these functions.
+
+
+```julia
+# your code here
+```
+
+Julia's type promotion rules make it is so programmers do not waste time casting objects to 'compatible' data types; they are already compatible.
+Importantly, operations with numbers already handle type promotion with reasonable defaults so that standard arithmetic "just works" out of the box.
+
+However, if you ever needed to handle conversions explicitly you can do it with the `convert` function:
+
+
+```julia
+convert(Complex{Float64}, 1.0) # specify the type, then give the object to convert
+```
 
 ### Program Control Flow
 
@@ -1047,278 +872,8 @@ countin('a', test_string) # should equal 1
 countin('o', mockify(test_string)) # should equal 4
 ```
 
-### Collections
 
-Roughly speaking, a *collection* is simply an object that stores multiple objects; e.g. an object that stores multiple literals.
-There are several important collections to know in Julia.
-Note that collects can be nested within each other, so it is possible to have an `Array` of `Array`s or a `Dict` of `NamedTuple` objects.
-
-Before diving into specific examples, you should be aware that collections share so much behavior that Julia defines [interfaces](https://docs.julialang.org/en/v1/manual/interfaces/) to make it easy to work with types that implement these common behaviors.
-Examples of interfaces include:
-
-* *indexing* to access a particular element in a collection, and
-* *iteration* to retrieve data from a collection in a predictable fashion (e.g. first, second, third...).
-
-#### Array
-
-A Julia [`Array`](https://docs.julialang.org/en/v1/base/arrays/) is an indexed collection with a particular shape determined by its dimensions.
-This means the elements of an `Array` are ordered; it makes sense to speak of "the first element" or "the last element". Here are a few examples:
-
-
-```julia
-rand(3)
-```
-
-
-```julia
-rand(3, 3)
-```
-
-
-```julia
-rand(3, 3, 3)
-```
-
-The `Array` type is actually a parametric type -- it defines a *family of types* parameterized by the element type and number of dimensions.
-Specifically, we have `Array{ElementType, NumberDimensions}`:
-
-
-```julia
-?Array
-```
-
-Note that `Array{T,1}` is an alias for `Vector{T}` and `Array{T,2}` is an alias for `Matrix{T}`.
-
-Instead of generating random arrays, we can create arrays with specific contents using square brackets `[]`:
-
-
-```julia
-x = [10.0, 3.2, sqrt(2)]
-```
-
-You can access elements of an `Array` using `x[<index>]`.
-**Note that Julia arrays start at index `1`!!!**.
-
-If you really hate this for some reason, or your algorithm needs special indexing, you can write your own array type just like in [OffsetArrays.jl](https://github.com/JuliaArrays/OffsetArrays.jl).
-
-
-```julia
-x[1]
-```
-
-You can also create matrices by separating elements in a row by spaces, and indicate a new row by a `;`.
-
-
-```julia
-y = [1 2 3; 4 5 6; 7 8 9]
-```
-
-You can specify a common type, too:
-
-
-```julia
-Float32[1 2 3; 4 5 6; 7 8 9]
-```
-
-You can use a linear index, e.g. `y[2]`, or coordinates, e.g. `y[2,1]` to acces the element `4`:
-
-
-```julia
-y[2] == y[2,1]
-```
-
-**Julia arrays are column-major, meaning elements are organized as contiguous data along columns**.
-This means that if you ever need to iterate over the elements of a multi-dimensional arrays, the "fast" dimension should be the first dimension.
-
-
-```julia
-for j in 1:3, i in 1:3 # (j,i) order is favored over (i,j) order
-    println("y[$i,$j] = $(y[i,j])")
-end
-```
-
-Lastly, you can select all the elements along a particular dimension using a colon `:`:
-
-
-```julia
-y[:, 1] # selects column 1
-```
-
-
-```julia
-y[2, :] # selects row 2
-```
-
-Julia arrays are mutable, so you can change the contents of a particular location in the array using the assignment operator `=`:
-
-
-```julia
-y[3,3] = 100
-```
-
-
-```julia
-y
-```
-
-Other operations that can mutate an array:
-
-
-```julia
-x = Int64[] # empty array of Int64 objects
-```
-
-
-```julia
-for j in 1:5
-    push!(x, j) # add an element at the end
-end
-
-x
-```
-
-
-```julia
-pop!(x); x # delete the last element
-```
-
-
-```julia
-y = rand(3)
-[x; y] # vertical concatenation; equivalent to vcat(x, y)
-```
-
-
-```julia
-y = rand(length(x))
-[x y] # horizontal concatenation; equivalent to hcat(x, y)
-```
-
-
-```julia
-
-```
-
-An `Array` has certain properties, like `length`, `size`, and `eltype`:
-
-
-```julia
-A = rand(10, 12)
-```
-
-
-```julia
-length(A)
-```
-
-
-```julia
-size(A)
-```
-
-
-```julia
-eltype(A)
-```
-
-#### Ranges
-
-A range is an object that behaves much like an `Array` in that it supports indexing and iteration.
-
-#### Tuples
-
-Tuples are similar to arrays in that they are lists of objects, but they do not have a shape.
-They are creatd using parantheses, `()`.
-
-
-```julia
-x = (1, 2, 3)
-```
-
-Accessing elements works the same as an `Array`:
-
-
-```julia
-x[2]
-```
-
-But a `Tuple` is immutable
-
-
-```julia
-x[2] = 100
-```
-
-So why would you use `Tuple`?
-Because a `Tuple` is immutable, it can be allocated on the stack -- its size is known exactly at compile time.
-Moreover, it is possible to make a heterogeneous list -- where elements have different types -- and have operations with the tuple be type-stable.
-
-
-```julia
-x = (1, "abc", 1.4)
-```
-
-
-```julia
-y = [x[1], x[2], x[3]]
-```
-
-
-```julia
-typeof(x) # element types are known exactly before checking
-```
-
-
-```julia
-typeof(y) # element types are only known once we index
-```
-
-#### NamedTuples
-
-A `NamedTuple` is similar to a `Tuple` except each field has a specific name.
-You can create a `NamedTuple` using key-value pairs within `(...):`
-
-
-```julia
-z = (a=1.0, b="two", c=3)
-```
-
-Access elements using the dot syntax
-
-
-```julia
-z.b
-```
-
-One particular use case for `NamedTuple` is for packaging several related variables into a single object, without having to write your own type.
-
-#### Dict (Dictionaries)
-
-A [`Dict`](https://docs.julialang.org/en/v1/base/collections/#Dictionaries) in Julia is an object that maps a specific *key* to a unique *value* (key-value pairs).
-Virtually anything can be used as a key or value, but you should prefer using immutable objects as keys to avoid headaches!
-
-One way to define a `Dict` is by specifying key-value `Pairs`, `<key> => <value>`. Julia will infer the key and value types automatically.
-
-
-```julia
-d = Dict("Alice" => 25, "Bob" => 22)
-```
-
-You can recover the value associated with a particular key using the usual indexing notation
-
-
-```julia
-d["Alice"]
-```
-
-And update its values with assignment
-
-
-```julia
-d["Bob"] = 33; d
-```
-
-### Modules and Packages: Using Other People's Code
+# Using Other People's Code
 
 #### Standard Library
 
@@ -1447,4 +1002,92 @@ using LinearAlgebra
 
 ```julia
 eigen
+```
+
+
+# What can I do with the Julia programming language?
+
+### Scientific Modeling
+
+**Credit**: [epirecipes](https://github.com/epirecipes/sir-julia/blob/master/markdown/ode/ode.md)
+
+OrdinaryDiffEq.jl is part of the SciML ecosystem.
+See the [organization's website](https://sciml.ai/) for more details.
+DifferentialEquations.jl is the main package with lots of extra features at the cutting edge of scientific machine learning.
+
+The following code implements a [Susceptible-Infected-Removed (SIR) model](https://github.com/epirecipes/sir-julia) for infectious diseases.
+- Infected individuals spread disease through 'contact' with susceptibles.
+- The rate at which individuals are infected is proportional to the proportion of infecteds in a population; it depends on an infection risk per contact, $\beta$, and an average contact rate, $c$.
+- Infecteds recover at a rate $\gamma > 0$, with $1/\gamma$ denoting an average recovery time.
+
+
+```julia
+using OrdinaryDiffEq, Plots
+
+function sir_ode!(du, u, p, t)
+    (S, I, R) = u
+    (β, c, γ) = p
+    N = S+I+R
+    @inbounds begin
+        du[1] = -β*c*I/N*S
+        du[2] = β*c*I/N*S - γ*I
+        du[3] = γ*I
+    end
+    nothing
+end
+
+# Initial conditions
+u0 = [990.0,10.0,0.0]; # S,I.R
+
+# Model parameters
+p = [0.05,10.0,0.25]; # β,c,γ
+
+# Timespan
+δt = 0.1
+tmax = 40.0
+tspan = (0.0,tmax)
+t = 0.0:δt:tmax
+
+# Create ODE problem and solve it
+prob_ode = ODEProblem(sir_ode!, u0, tspan, p)
+sol = solve(prob_ode, Tsit5())
+
+# Plot the solution
+plot(sol, xlabel="time, t", ylabel="population, u(t)", label=["S" "I" "R"], legend=:outerright)
+```
+
+### Fast Linear Algebra
+
+[BLAS](https://en.wikipedia.org/wiki/Basic_Linear_Algebra_Subprograms) and [LAPACK](https://en.wikipedia.org/wiki/LAPACK) are important libraries for carrying out *fast and correct* linear algebra operations on computers.
+There are various implementations written in 'low-level' languages like C or Fortran, sometimes tuned for specific hardware, dating back to 1979.
+
+Developers in Julia are exploring the possibility of implementing linear algebra subroutines within the Julia language.
+The following compares the default BLAS implementation (OpenBLAS) shipped with Julia against [Octavian.jl](https://github.com/JuliaLinearAlgebra/Octavian.jl).
+A more detailed look (with different hardware) can be found [here](https://github.com/JuliaLinearAlgebra/Octavian.jl/issues/24#issuecomment-763704038).
+
+Run a separate Julia process using the `linalg.jl` script.
+It takes in two arguments, # BLAS threads and matrix size. 
+```julia
+run(`/home/alanderos/julia-1.6.1/bin/julia --project=@. linalg.jl 10 1000`)
+```
+
+Run a separate Julia process using the `octavian.jl` script.
+It requires you specify the number of threads (`-t 10`; match to # physical cores) and matrix size (`1000`).
+```julia
+run(`/home/alanderos/julia-1.6.1/bin/julia --project=@. -t 10 octavian.jl 1000`)
+```
+
+```julia
+versioninfo(verbose=true)
+```
+
+**Note**: OpenBLAS may not always be able to detect the correct architecture until it is updated, and so it will default to the next best available subroutines.
+[The codename Prescott dates back to Intel's Pentium 4 from the 00s](https://ark.intel.com/content/www/us/en/ark/products/codename/1791/prescott.html).
+In reality the gap may be closer than reported here.
+
+**Note**: Many programming languages for statistics, data science, or other technical computing use a BLAS implementation like OpenBLAS (R for example).
+
+```julia
+using LinearAlgebra
+BLAS.openblas_get_config()
 ```

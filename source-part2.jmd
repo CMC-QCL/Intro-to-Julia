@@ -3,15 +3,493 @@
 
 # Agenda
 
-1. Project: Writing a Root Finding Program
+1. More on "Why Julia?"
+2. Collections
+    - Arrays
+    - Ranges
+    - Tuples
+    - Dictionaries
+    - Iteration
+3. More on Types
+4. Project: Writing a Root Finding Program
     - Overview of Newton's Method
     - Handling Derivatives
     - Adding Visual Feedback
-2. Additional Topics
+5. Additional Topics
     - Broadcasting
-    - More on Types, Immutability, Type Stability
+    - Immutability and Type Stability
     - More on Function Arguments and Methods
     - Multiple Dispatch
+
+# More on "Why Julia?"
+
+Credit: Arch D. Robison
+
+|   |   |
+|---|---|
+| <img src="julia_toolchain.png" alt="julia_toolchain.png" width="400"/> | <img src="julia_introspect.png" alt="julia_introspect.png" width="530"/> |
+
+**Big Picture**: Julia's *design* uses a robust type system to pass type information to a compiler that can then generate efficient machine code.
+
+The type system uses *multiple dispatch* to help programmers write generic type-stable code; type-stable code is easy for the compiler to reason about.
+
+On the surface, Julia syntax looks like any other scripting language because it is quite human readable.
+However, Julia code is much more explicit than it appears on the surface.
+
+Dr. Chris Rackauckas has [an excellent page](https://ucidatascienceinitiative.github.io/IntroToJulia/Html/JuliaMentalModel) on developing a mental model for Julia:
+
+> **A Mental Model for Julia: Talking to a Scientist**
+> * When you're talking, everything looks general. However, you really mean very specific details determined by context.
+> * You can quickly dig deep into a subject, assuming many rules, theories, and terminology.
+> * Nothing is hidden: if you ever want to hear about every little detail, you can ask.
+> * They will get mad (and throw errors at you) if you begin to be loose with the specific details.
+
+Let's look at an example.
+The following function computes the sum
+$$x_{1} + x{2} + \ldots + x_{m} + y_{1} + y_{2} + \ldots + y_{n}$$
+
+```julia
+function mysum(x, y)
+    s = zero(x[1])
+
+    for i in eachindex(x)
+        s = s + x[i] # sum up elements of x
+    end
+
+    for j in eachindex(y)
+        s += y[j]    # sum up elements of y
+    end
+
+    return s
+end
+```
+
+First check that the function works as intended.
+```julia
+x = rand(5) # random vector with 5 elements [x_1, x_2, ..., x_5]
+y = rand(8)
+mysum(x, y) == sum(x) + sum(y)
+```
+
+It works when the inputs are different collection types; i.e. `Vector` vs `Tuple`.
+```julia
+x = [2, 4, 6] # vector
+y = (1.0, 3.0, 5.0) # tuple
+mysum(x, y) == sum(x) + sum(y)
+```
+
+It works for scalars.
+```julia
+mysum(1, 1) == 1 + 1
+```
+
+It works for vectors of vectors
+```julia
+x = [rand(3), rand(3)]
+y = [rand(3)]
+mysum(x, y) == x[1] + x[2] + y[1]
+```
+
+But it fails here and Julia tells you why
+```julia
+x = [rand(3), rand(3)] # Vector of vectors 
+y = [(1.0, 3.0, 5.0)] # Vector of tuples
+mysum(x, y) == x[1] + x[2] + y[1]
+```
+
+What does Julia do differently in each case?
+You can ask with tools like `@code_warntype` and `@code_llvm` to see for yourself.
+
+```julia
+@code_warntype mysum(1, 1)
+```
+
+```julia
+@code_llvm mysum(1, 1)
+```
+
+```julia
+@code_warntype mysum(rand(3), rand(4))
+```
+
+```julia
+@code_llvm mysum(rand(3), rand(4))
+```
+
+**Takeaway**: You can be verbose or terse with the Julia language, but it's best to be concise.
+
+# Collections
+
+Roughly speaking, a *collection* is simply an object that stores multiple objects; e.g. an object that stores multiple literals.
+There are several important collections to know in Julia.
+Note that collections can be nested within each other, so it is possible to have an `Array` of `Array`s or a `Dict` of `NamedTuple` objects.
+
+Before diving into specific examples, you should be aware that collections share so much behavior that Julia defines [interfaces](https://docs.julialang.org/en/v1/manual/interfaces/) to make it easy to work with types that implement these common behaviors.
+Examples of interfaces include:
+
+* *indexing* to access a particular element in a collection, and
+* *iteration* to retrieve data from a collection in a predictable fashion (e.g. first, second, third...).
+
+#### Array
+
+A Julia [`Array`](https://docs.julialang.org/en/v1/base/arrays/) is an indexed collection with a particular shape determined by its dimensions.
+This means the elements of an `Array` are ordered; it makes sense to speak of "the first element" or "the last element".
+Here are a few examples:
+
+
+```julia
+rand(3)
+```
+
+
+```julia
+rand(3, 3)
+```
+
+
+```julia
+rand(3, 3, 3)
+```
+
+The `Array` type is actually a parametric type -- it defines a *family of types* parameterized by the element type and number of dimensions.
+Specifically, we have `Array{ElementType, NumberDimensions}`:
+
+
+```julia
+?Array
+```
+
+Note that `Vector{T}` is an alias for `Array{T,1}` and `Matrix{T}` is an alias for `Array{T,2}`.
+
+Instead of generating random arrays, we can create arrays with specific contents using square brackets `[]`:
+
+
+```julia
+x = [10.0, 3.2, sqrt(2)]
+```
+
+You can access elements of an `Array` using `x[<index>]`.
+**Note that Julia arrays start at index `1`!!!**.
+
+```julia
+@show x[1] # first element
+@show x[end] # last element
+```
+
+If you really hate this for some reason, or your algorithm needs special indexing, you can write your own array type just like in [OffsetArrays.jl](https://github.com/JuliaArrays/OffsetArrays.jl).
+
+
+You can also create matrices by separating elements in a row by spaces, and indicate a new row by a `;`.
+
+
+```julia
+y = [1 2 3; 4 5 6; 7 8 9]
+```
+
+You can specify a common type, too:
+
+
+```julia
+Float32[1 2 3; 4 5 6; 7 8 9]
+```
+
+Use linear indices, e.g. `y[2]`, or coordinates, e.g. `y[2,1]` to acces the element `4`:
+
+
+```julia
+y[2] == y[2,1]
+```
+
+**Julia arrays are column-major, meaning elements are organized as contiguous data along columns**.
+This means that if you ever need to iterate over the elements of a multi-dimensional arrays, the "fast" dimension should be the first dimension.
+
+
+```julia
+for j in 1:3, i in 1:3 # (j,i) order is favored over (i,j) order
+    println("y[$i,$j] = $(y[i,j])")
+end
+```
+
+Lastly, you can select all the elements along a particular dimension using a colon `:`:
+
+
+```julia
+y[:, 1] # selects column 1
+```
+
+
+```julia
+y[2, :] # selects row 2
+```
+
+Julia arrays are mutable, so you can change the contents of a particular location in the array using the assignment operator `=`:
+
+
+```julia
+y[3,3] = 100
+```
+
+
+```julia
+y
+```
+
+Other operations that can mutate an array:
+
+
+```julia
+x = Int64[] # empty array of Int64 objects
+```
+
+
+```julia
+for j in 1:5
+    push!(x, j) # add an element at the end
+end
+
+x
+```
+
+
+```julia
+pop!(x); x # delete the last element
+```
+
+
+```julia
+y = rand(3)
+[x; y] # vertical concatenation; equivalent to vcat(x, y)
+```
+
+
+```julia
+y = rand(length(x))
+[x y] # horizontal concatenation; equivalent to hcat(x, y)
+```
+
+
+```julia
+
+```
+
+An `Array` has certain properties, like `length`, `size`, and `eltype`:
+
+
+```julia
+A = rand(10, 12)
+```
+
+
+```julia
+length(A)
+```
+
+
+```julia
+size(A)
+```
+
+
+```julia
+eltype(A)
+```
+
+#### Ranges
+
+A range is an object that behaves much like an `Array` in that it supports indexing and iteration.
+
+```julia
+0:2:10 # elements from 0 to 10, inclusive, with step length 2
+```
+
+```julia
+range(0, 10, step=2) # same as before
+```
+
+#### Tuples
+
+Tuples are similar to arrays in that they are lists of objects, but they do not have a shape.
+They are creatd using parantheses, `()`.
+
+
+```julia
+x = (1, 2, 3)
+```
+
+Accessing elements works the same as an `Array`:
+
+
+```julia
+x[2]
+```
+
+But a `Tuple` is immutable
+
+
+```julia
+x[2] = 100
+```
+
+So why would you use `Tuple`?
+Because a `Tuple` is immutable, it can be allocated on the stack -- its size is known exactly at compile time.
+In contrast, an `Array` is mutable so you can change its contents and its size; it is allocated on the heap.
+Moreover, it is possible to make a heterogeneous list -- where elements have different types -- and have operations with the tuple be type-stable.
+
+
+```julia
+x = (1, "abc", 1.4)
+```
+
+
+```julia
+y = [x[1], x[2], x[3]]
+```
+
+
+```julia
+typeof(x) # element types are known exactly before checking
+```
+
+
+```julia
+typeof(y) # element types are only known once we index
+```
+
+#### NamedTuples
+
+A `NamedTuple` is similar to a `Tuple` except each field has a specific name.
+You can create a `NamedTuple` using key-value pairs within `(...):`
+
+
+```julia
+z = (a=1.0, b="two", c=3)
+```
+
+Access elements using the dot syntax
+
+
+```julia
+z.b
+```
+
+One particular use case for `NamedTuple` is for packaging several related variables into a single object, without having to write your own type.
+
+#### Dict (Dictionaries)
+
+A [`Dict`](https://docs.julialang.org/en/v1/base/collections/#Dictionaries) in Julia is an object that maps a specific *key* to a unique *value* (key-value pairs).
+Virtually anything can be used as a key or value, but you should prefer using immutable objects as keys to avoid headaches!
+
+One way to define a `Dict` is by specifying key-value `Pairs`, `<key> => <value>`. Julia will infer the key and value types automatically.
+
+
+```julia
+d = Dict("Alice" => 25, "Bob" => 22)
+```
+
+You can recover the value associated with a particular key using the usual indexing notation
+
+
+```julia
+d["Alice"]
+```
+
+And update its values with assignment
+
+
+```julia
+d["Bob"] = 33; d
+```
+
+# More on Types
+
+Julia has a flexible [type system](https://docs.julialang.org/en/v1/manual/types/).
+As we've seen, a "type" roughly translates to "class" in object oriented programming (OOP).
+In contrast to OOP, however, Julia types have *very* strict notion of inheritance: you can't extend concrete types.
+Here we won't discuss how polymorphism or design work in Julia, but rather take a closer look at the anatomy of types.
+
+There are three main classes of types to be aware of as you start with the language:
+
+1. Composite Types: Types that combine other data types.
+2. Parametric Types: Types that define a *family* of types, parameterized by some variables.
+3. Abstract Types: These are just "nodes" in a hierarchy. You can define functions with them or use them in type annotations, but you cannot make instances.
+For example, an `Int` is a subtype of `Real` so it sits somewhere in a hierarchy including both types.
+
+Importantly, types can be defined at any point in time, but their structure cannot be changed once defined.
+This means:
+
+- You can edit functions that use a particular type, but not change what fields are part of the type after it's been defined.
+- You can update a type's constructors. For our purposes, a constructor is merely a function that creates an instance of a type.
+
+In the following code, note that `<name>::<type>` is a *type annotation* which declares that a particular variable has a certain type.
+Type annotations can be used anywhere, including
+
+- function signatures, which limit the type of arguments that can go into the function, and
+- code blocks/function bodies, which enforce that an object must have a certain type.
+
+
+```julia
+struct Point2D # define an (immutable) type named Point2D
+    x::Float64 # has a field x which is a Float64
+    y::Float64 # has a field y which is a Float64
+end
+```
+
+```julia
+Point2D(1.0, 0.0) # Julia automatically defines a constructor for you
+```
+
+```julia
+struct ParPoint2D{T <: Real} # define a type family where type T must be a subtype Real number
+    x::T # has a field x, which has type T
+    y::T # has a field y, which is ALSO type T
+end
+```
+
+```julia
+ParPoint2D(0,0) # type parameter automatically inferred
+```
+
+```julia
+ParPoint2D{Float64}(0, 0) # note the automatic conversion
+```
+
+We can define a no-argument constructor that defaults to the origin.
+Note that here we must specify the type parameter using `{T}` and state that `T` is a free parameter using `where`.
+Writing `where T` roughly translates to `where T <: Any` but we could also restrict `where T <: Real` if we want. 
+
+```julia
+ParPoint2D{T}() where T = ParPoint2D{T}(zero(T), zero(T)).
+```
+
+Note that this generic version works for many data types:
+
+```julia
+@show ParPoint2D{Float64}()
+@show ParPoint2D{Int}()
+```
+
+The alternative would be to write a no-argument constructor for every possible type value for `T`; e.g. `ParPoint{Float64} = ParPoint(0.0, 0.0)` which is tedious.
+The generic version is guaranteed to work for any subtype of `Real`, *even types that did not exist when we implemented our type*.
+
+One of the benefits of the Julia language is the ability to overload standard functions to take advantage of composition.
+For example, it's possible to define a notion of addition with points by overloading `+`:
+
+```julia
+import Base: + # existing functions must imported explicitly in order to overload them 
+
+function Base.:+(A::ParPoint2D, B::ParPoint2D) # we could specify type parameters but there's no need
+    return ParPoint2D(A.x + B.x, A.y + B.y)
+end
+
+ParPoint2D(1,1) + ParPoint2D(2,1)
+```
+
+Now anything that relies on `+` "just works":
+
+```julia
+list = [ParPoint2D(1,1), ParPoint2D(2,1), ParPoint2D(3,0)]
+sum(list)
+```
 
 # Projects
 
@@ -550,97 +1028,6 @@ Macros are quite an advanced topic, but here we will simply mention a few macros
 4. `@code_warntype`: useful for checking Julia code for type stability
 5. `@.`: Add `.` to functions in an expression to induce broadcasting
 6. `@assert`: Check that an expression evaluates to true; otherwise throw an error.
-
-### A little more on types
-
-Julia has a flexible [type system](https://docs.julialang.org/en/v1/manual/types/).
-As we've seen, a "type" roughly translates to "class" in object oriented programming (OOP).
-In contrast to OOP, however, Julia types have *very* strict notion of inheritance: you can't extend concrete types.
-Here we won't discuss how polymorphism or design work in Julia, but rather take a closer look at the anatomy of types.
-
-There are three main classes of types to be aware of as you start with the language:
-
-1. Composite Types: Types that combine other data types.
-2. Parametric Types: Types that define a *family* of types, parameterized by some variables.
-3. Abstract Types: These are just "nodes" in a hierarchy. You can define functions with them or use them in type annotations, but you cannot make instances.
-For example, an `Int` is a subtype of `Real` so it sits somewhere in a hierarchy including both types.
-
-Importantly, types can be defined at any point in time, but their structure cannot be changed once defined.
-This means:
-
-- You can edit functions that use a particular type, but not change what fields are part of the type after it's been defined.
-- You can update a type's constructors. For our purposes, a constructor is merely a function that creates an instance of a type.
-
-In the following code, note that `<name>::<type>` is a *type annotation* which declares that a particular variable has a certain type.
-Type annotations can be used anywhere, including
-
-- function signatures, which limit the type of arguments that can go into the function, and
-- code blocks/function bodies, which enforce that an object must have a certain type.
-
-
-```julia
-struct Point2D # define an (immutable) type named Point2D
-    x::Float64 # has a field x which is a Float64
-    y::Float64 # has a field y which is a Float64
-end
-```
-
-```julia
-Point2D(1.0, 0.0) # Julia automatically defines a constructor for you
-```
-
-```julia
-struct ParPoint2D{T <: Real} # define a type family where type T must be a subtype Real number
-    x::T # has a field x, which has type T
-    y::T # has a field y, which is ALSO type T
-end
-```
-
-```julia
-ParPoint2D(0,0) # type parameter automatically inferred
-```
-
-```julia
-ParPoint2D{Float64}(0, 0) # note the automatic conversion
-```
-
-We can define a no-argument constructor that defaults to the origin.
-Note that here we must specify the type parameter using `{T}` and state that `T` is a free parameter using `where`.
-Writing `where T` roughly translates to `where T <: Any` but we could also restrict `where T <: Real` if we want. 
-
-```julia
-ParPoint2D{T}() where T = ParPoint2D{T}(zero(T), zero(T)).
-```
-
-Note that this generic version works for many data types:
-
-```julia
-@show ParPoint2D{Float64}()
-@show ParPoint2D{Int}()
-```
-
-The alternative would be to write a no-argument constructor for every possible type value for `T`; e.g. `ParPoint{Float64} = ParPoint(0.0, 0.0)` which is tedious.
-The generic version is guaranteed to work for any subtype of `Real`, *even types that did not exist when we implemented our type*.
-
-One of the benefits of the Julia language is the ability to overload standard functions to take advantage of composition.
-For example, it's possible to define a notion of addition with points by overloading `+`:
-
-```julia
-import Base: + # existing functions must imported explicitly in order to overload them 
-
-function Base.:+(A::ParPoint2D, B::ParPoint2D) # we could specify type parameters but there's no need
-    return ParPoint2D(A.x + B.x, A.y + B.y)
-end
-
-ParPoint2D(1,1) + ParPoint2D(2,1)
-```
-
-Now anything that relies on `+` "just works":
-
-```julia
-list = [ParPoint2D(1,1), ParPoint2D(2,1), ParPoint2D(3,0)]
-sum(list)
-```
 
 ### (Im)mutability and function name conventions
 

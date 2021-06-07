@@ -1,3 +1,7 @@
+# Run on Binder
+
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/CMC-QCL/Intro-to-Julia/HEAD)
+
 # Installation
 
 [Make sure you download Julia 1.6](https://julialang.org/downloads/) (or higher) and install for your system.
