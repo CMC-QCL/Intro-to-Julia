@@ -11,11 +11,16 @@
     - Dictionaries
     - Iteration
 3. More on Types
-4. Project: Writing a Root Finding Program
+4. Using Other People's Code
+    - Standard Library
+    - Registered Packages
+    - Environments
+    - Modules
+5. Project: Writing a Root Finding Program
     - Overview of Newton's Method
     - Handling Derivatives
     - Adding Visual Feedback
-5. Additional Topics
+6. Additional Topics
     - Broadcasting
     - Immutability and Type Stability
     - More on Function Arguments and Methods
@@ -294,6 +299,36 @@ size(A)
 eltype(A)
 ```
 
+**Exercise** Implement a function `pascal(n)` that fills in an array with the binomial coefficients of an order $n$ polynomial.
+
+*Hint*: You only need half of a 2D array for the result. 
+
+```julia
+function pascal(n)
+    A = zeros(Int, n+1, n+1)
+    for i in 1:n+1, j in 1:(n+1-i+1)
+        if (i > 1) && (j > 1)
+            A[i,j] = A[i-1,j] + A[i,j-1]
+        else
+            A[i,j] = 1
+        end
+    end
+    return A
+end
+```
+
+```julia
+pascal(0)
+```
+
+```julia
+pascal(1)
+```
+
+```julia
+pascal(2)
+```
+
 #### Ranges
 
 A range is an object that behaves much like an `Array` in that it supports indexing and iteration.
@@ -400,6 +435,24 @@ And update its values with assignment
 d["Bob"] = 33; d
 ```
 
+**Exercise**: Write a function that counts the number of each character in a `String`, storing the result in a dictionary.
+*Hint*: A `String` is an iterable object so that `for char in str` makes sense in Julia.
+Take a `Char` as a key and use the dictionary to map it to an `Int`.
+
+```julia
+function countmap(str)
+    d = Dict{Char,Int}(c => 0 for c in str)
+    for c in str
+        d[c] += 1
+    end
+    return d
+end
+```
+
+```julia
+countmap("hello")
+```
+
 # More on Types
 
 Julia has a flexible [type system](https://docs.julialang.org/en/v1/manual/types/).
@@ -489,6 +542,137 @@ Now anything that relies on `+` "just works":
 ```julia
 list = [ParPoint2D(1,1), ParPoint2D(2,1), ParPoint2D(3,0)]
 sum(list)
+```
+
+# Using Other People's Code
+
+#### Standard Library
+
+Julia ships with its own standard library.
+The functions immediately available mostly live in the Base module.
+Other useful packages include: 
+
+- LinearAlgebra, for everything linear algebra
+- DelimitedFiles, for working with formatted files (e.g. tab or comma separated)
+- Statistics, many standard statistics functions
+- Random, random number generation
+- Printf, for printing formatted strings (C-style)
+- Pkg, the Julia pacakge manager
+
+#### Registered Packages
+
+Julia users and developers are free to contribute to the Julia package ecosystem by registering them.
+The **General** registry belongs to the whole community, but it is also possible to create your own private registry that contains your own packages (hosting is a separate issue).
+
+Regardless, you can manage community-contributed packages using the Pkg module.
+
+Some examples include:
+
+* DifferentialEquations
+* Distributions
+* DataFrames
+* BenchmarkTools
+
+and many, many more.
+
+Here are a few tips for package management:
+
+- Commands with Pkg and `]` (pkg-mode) are equivalent.
+- `Pkg.add("Example")` or `] add Example` will add the Example package to your *environment*.
+- `Pkg.status()` or `] status` will tell you the list of installed packages for the current environment.
+- `Pkg.remove("Example")` removes a package.
+- `Pkg.activate("path/to/dir")` will activate the environment at `path/to/dir`. Julia searches the specified folder for a `Project.toml` file, or uses an empty one if it does not exist.
+- Use `Pkg.activate(".")` to return to the default environment.
+
+#### Environments
+
+The list of explicitly installed packages is stored in a file called `Project.toml`.
+The main environment is usually called `v1.x` where `x` is the minor Julia version and lives in `~/.julia/environments/v1.x`.
+This is important because it helps you reproduce the environment used in developing a project!
+
+#### How to Actually Use Packages
+
+Packages live inside [*modules*](https://docs.julialang.org/en/v1/manual/modules/). They are defined using module code blocks.
+
+
+```julia
+module MyExample
+    println("This module is loading")
+    helloworld() = println("Hello world! This is my contribution.") # define a function
+    println("We're done")
+
+    export helloworld # export the function by default so others can use it
+end
+```
+
+We see the code executed. Let's try calling the function we made:
+
+```julia
+helloworld()
+```
+
+
+This fails because we've not loaded the module, only defined it.
+You can use `import` to load it:
+
+```julia
+import Main.MyExample # MyExample is defined in the Main scope, so we need to address it
+```
+
+```julia
+helloworld()
+```
+
+This still fails? The reason is `import` tells us to load the module, but prevents exported functions from being brought into scope. We have to be explicit about where the function comes from in this case.
+
+
+```julia
+Main.MyExample.helloworld()
+```
+
+This can be a bit tedious, so fortunately Julia lets us bind a module to a variable to make it easier to write:
+
+
+```julia
+ME = Main.MyExample
+```
+
+```julia
+ME.helloworld()
+```
+
+Alternatively, the `using` keyword brings all exported functions into scope:
+
+
+```julia
+using Main.MyExample
+```
+
+```julia
+helloworld()
+```
+
+Yet another option: You can explicitly choose which functions to bring into scope when you ivoke `using`:
+
+
+```julia
+using LinearAlgebra: norm # only bring norm into scope, unqualified
+```
+
+```julia
+norm(rand(3))
+```
+
+```julia
+eigen # lives in LinearAlgebra
+```
+
+```julia
+using LinearAlgebra
+```
+
+```julia
+eigen
 ```
 
 # Projects
