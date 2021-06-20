@@ -1,4 +1,5 @@
-using Weave
+using Literate: notebook
 
-convert_doc("source-part1.jmd", "Part-I.ipynb")
-convert_doc("source-part2.jmd", "Part-II.ipynb")
+for file in readdir("literate", join=true)
+  notebook(file, execute=false)
+end
