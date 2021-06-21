@@ -5,7 +5,6 @@
 # 1. What is Julia?
 # 2. Literals, Variables, and Functions
 # 3. Program Control Flow
-# 4. Arrays and Comprehensions
 
 # ### Learning Goals
 #
@@ -161,17 +160,44 @@ x₀ = 0.5 # type x\_0 → Tab
 ## your solution goes here
 
 # ### Functions
-#
-# 
 
 # #### Built-in functions
 #
-# First we look at *operators*, which are mostly just short names for regular Julia functions.
+# First we discuss printing functions which are useful for displaying information.
+# Next, we look at *operators*, which are mostly just short names for regular Julia functions.
 # There are some exceptional cases and we'll point those out as we go.
 # The list here is not exhaustive ([see for example](https://docs.julialang.org/en/v1/manual/functions/#Operators-With-Special-Names)).
 # 
 # In the case of math, you may want to familiarize yourself with [operator precedence](https://docs.julialang.org/en/v1/manual/mathematical-operations/#Mathematical-Operations-and-Elementary-Functions).
 
+# ##### Printing
+#
+# There are two functions to know: `print` and `println` which accept multiple arguments, string or otherwise.
+# If the passed object is not a string, Julia will derive some representation of the object. 
+#
+# Note that the character `\n` indicates a newline.
+
+myvariable = "four"
+myothervar = pi
+#-
+print("The value of myvariable is ", myvariable, ".\n")
+print("The value of myothervar is ", myothervar, ".\n")
+#-
+println("The value of myvariable is ", myvariable, ".")
+println("The value of myothervar is ", myothervar, ".")
+
+# The documentation (`?print`) discusses how these functions can be used to print to a stream other than "standard output", `stdout`. 
+
+# Triple-quoted strings `"""..."""` interpret whitespace, specifically indentation and newlines.
+# The `$` symbol can be used to interpolate a variable's value into a string.
+# More generally, `$(ex)` will interpolate the value of an expression `ex`.
+
+print(
+"""
+The value of myvariable is $myvariable.
+  1 + 1 is $(1 + 1).
+"""
+)
 
 # ##### [Artihmetic operators](https://docs.julialang.org/en/v1/manual/mathematical-operations/#Arithmetic-Operators) are supported in Julia
 #
@@ -263,6 +289,9 @@ true || "this is never evaluated"
 
 # Julia implements many common mathematical functions within the base language.
 # Starting from rounding, see the [list](https://docs.julialang.org/en/v1/manual/mathematical-operations/#Rounding-functions) here.
+#
+# The @show *macro* is used here as shorthand for printing an expression and its value.
+# We'll discuss macros later in the next part.
 
 @show exp(1)         # exponential
 @show sqrt(2)        # valid for non-negative arguments
@@ -294,6 +323,19 @@ function g(x)
 end
 #-
 g(2.5)
+
+# If you know a function returns multiple arguments, you can easily "destructure" the return value and assign to multiple variables.
+
+both = g(2.5) # bind everything to one variable
+#-
+x, y = g(2.5) # bind to x and y
+#-
+_, z = g(2.5) # ignore one with special character _, bind the second to z
+#-
+@show both
+@show x
+@show y
+@show z
 
 # ### Exercise 1.4
 #
@@ -327,18 +369,17 @@ end
 # ### Exercise 1.5
 #
 # Write a function that evaluates the quadratic $a x^{2} + b x + c$.
-# Call your function `evalulate_quadratic`.
+# Call your function `evaluate_quadratic`.
 # It should take four (4) inputs, `a`, `b`, `c`, and `x`, in that order.
 
 ## write your code here
 
 # Test your code by running the following code block.
-# Here we use the `@show` *macro* to print an expression and its value.
 
-@show evalulate_quadratic(0, 0, 2.0, 100.0)   # == 2
-@show evalulate_quadratic(1.0, 0, 0, 10.0)    # == 100
-@show evalulate_quadratic(0, 1.0, 0, 10.0)    # == 10
-@show evalulate_quadratic(2, 1, -10, 2)       # == 0 
+@show evaluate_quadratic(0, 0, 2.0, 100.0)   # == 2
+@show evaluate_quadratic(1.0, 0, 0, 10.0)    # == 100
+@show evaluate_quadratic(0, 1.0, 0, 10.0)    # == 10
+@show evaluate_quadratic(2, 1, -10, 2)       # == 0 
 
 # ### Exercise 1.6
 # Fill in the formula in the following function, which computes both roots of a quadratic,
@@ -374,8 +415,8 @@ end
 
 a = 1.0; b = 100.0; c = 1.0 # represents x^2 + 100*x + 1
 r1, r2 = quadratic_formula(a, b, c)
-@show evalulate_quadratic(a, b, c, r1)
-@show evalulate_quadratic(a, b, c, r2)
+@show evaluate_quadratic(a, b, c, r1)
+@show evaluate_quadratic(a, b, c, r2)
 
 # Depending on how you chose to implement your function, one of the results above is not $0$ but close to it.
 # In this case, $b^{2}$ is much larger compared to $4ac$ which means $b^{2} - 4ac$ is subject to *roundoff error*.
@@ -443,6 +484,9 @@ end
 #-
 roll_die()
 
+# Note that a value is returned even though we didn't specify a value outside the conditional block.
+# **Code blocks in Julia will always evaluate to *something*.**
+
 # The ternary operator (3-argument) `?` can be used to write `if-else` statements compactly.
 # Try running the following code a few times to see how it works.
 
@@ -477,25 +521,81 @@ end
 # ### Repeated evaluation
 #
 # `for` loops in Julia allow you to repeat a set of instructions based on a condition.
+# In Julia, `for` loops are defined over an *iterable* object so the condition is typically to repeat evaluation until the iterable object is exhausted.
 #
-# For example one can iterate over the values in a range.
+# The `UnitRange` and `StepRange` objects are particularly well suited for this task.
+# Both objects depend on *integer* arguments (but as you saw earlier, there is an analogous version for ranges over the real line).
+
+# A `UnitRange` object defines a collection of integers between a start and end point, inclusively.
+# Elements in the collection are assumed to be separated by a *unit* step size.
+# 
+# For example:
+
+1:10 # start:stop; this is 1, 2, 3, ... , 10; end points are included
+#-
+UnitRange(1, 10) # alternative using a constructor directly
+#-
+10:0 # empty range because start > stop
+
+# A `StepRange` object takes 3 integer arguments: a start point, a step size, and an end point.
+
+0:2:10 # start:step:stop; this is 0, 2, 4, ... , 10.
+#-
+StepRange(0, 2, 10) # alternative syntax
+#-
+10:-2:0 # you can use a negative step size to iterate in descending order
+
+# Unlike `UnitRange`, a `StepRange` object may not include the end point.
+# Specifically, if `stop` is not divisible by `start + step*n` for some integer `n`, then 
+# the end point is changed to the closest value of the form `start + step*n`.
+
+1:2:10 # 1, 3, 5, 7, 9; the end point is changed
+#-
+2:3:10 # what about here?
+
+# Lastly, you can put expressions inside the special : operator syntax.
+
+2*1 : 1+1 : 2^2 # 2, 4; whitespace is allowed and parentheses are not required
+
+# Now we can define our first `for` loop:
 
 for i = 1:10 # for i equal to 1, 2, ..., 10.
   println("The value of i is $(i)")
 end
 #-
-for i in 1:10 # prefered style in Julia
+for i in 1:10 # prefered style in Julia is to use `in` or `∈` (\in → Tab)
   println("The value of i is $(i)")
 end
 
 # You can also iterate over the elements of an Array.
-mylist = rand('a':'z', 10)
+
+mylist = ['J', 'u', 'l', 'i', 'a']
 
 for (i, item) in enumerate(mylist)
   println("The item at index $(i) is $(item)")
 end
 
+# **Note**: In all these examples, the variables defined within each `for` loop belong to a *local scope* defined by the loop.
+# This means `i` and `item` are not available outside the loops.
+
+i # should throw an error unless you defined `i` somewhere
+#-
+item # should also throw an error
+
+# We will discuss variable scope in more detail later.
+
 # ### Exercise 1.8
+#
+# Write a function, called `mysum` which evaluates $1^{2} + 2^{2} + \ldots + n^{2}$.
+# It should accept a single argument `n`, assumed to be an integer.
+# 
+# Check your answer using the identity $\frac{1}{6} \times n \times (n+1) \times (2n + 1)$.
+
+## write your solution here
+#-
+## test your solution here
+
+# ### Exercise 1.9
 #
 # Implement the factorial function using a `for` loop.
 # Recall the definition
@@ -513,11 +613,9 @@ end
 
 # Compare your implementation against your solution to Exercise 1.7 and the Julia's own `factorial`.
 
-factorial_recursive(21)
-
-factorial_loop(21)
-
-factorial(21)
+@show factorial_recursive(21)
+@show factorial_loop(21)
+@show factorial(21)
 
 # `while` loops allow one to repeat a sequence of instructions without knowing how many times they should be repeated.
 
@@ -540,7 +638,62 @@ end
 # Care must be taken to make sure a `while` loop eventually terminates.
 # If you accidentally make an infinite `while` loop, just use the "Interrupt the kernel" button (□), `Esc` → `C`, or `Ctrl + C`.
 
-# ### Exercise 1.9
+# ### Nested loops
+#
+# Both `for` and `while` loops can be nested inside each other.
+
+count_A = 0
+count_B = 0
+
+while count_A < 10
+  while count_B ≤ count_A
+    println(count_A, " ", count_B)
+    count_B += 1
+  end
+  count_A += 2
+end
+
+# Note that it is possible to reference variables defined within the nested scopes.
+# Try running the following code.
+
+for j in 1:4
+  for i in 1:j # reference the variable j, which is visible here
+    print(i, ' ')
+  end
+  println()
+end
+
+# `for` loops are special in that you can indicate nested loops using commas (`,`):
+
+for j in 1:3, i in 1:3 # loops nested from left to right, left being top-level
+  println("(i, j) = ($i, $j)")
+end
+
+# ### Loop control
+#
+# Lastly, it is worth mentioning two useful keyword, `continue` and `break`.
+# - `continue` is used to skip over an iteration, typically based on some condition.
+# - `break` is used to terminate a loop early altogether.
+#
+# Here are a few examples to illustrate potential use cases:
+
+for i in 1:10
+  if i % 2 == 0 # if i is even; can also use `iseven`
+    continue
+  end
+  println(i) # only odd numbers
+end
+#-
+s = 0
+while true
+  println(s)
+  s = s + 1
+  if s > 10
+    break
+  end
+end
+
+# ### Exercise 1.10
 #
 # Credit: [Algorithms from THE BOOK](https://locus.siam.org/doi/book/10.1137/1.9781611976175?mobileUi=0&) by Kenneth Lange
 #
@@ -562,7 +715,6 @@ end
 function babylonian(a, x0, tol)
   x_cur = x0            # current estimate
   x_old = x0            # previous estimate
-  not_converged = true  # indicates lack of convergence
   iter = 0              # number of iterations
   
   ## your code goes here
@@ -579,7 +731,7 @@ observed = babylonian(a, x0, 1e-6)
 expected = sqrt(a)
 abs(observed - expected)
 
-# ### Exercise 1.10
+# ### Exercise 1.11
 #
 # Write a function that counts the number of times a character `char` occurs in a given string `str`.
 # It should treat the upper and lower case characters as being the same; e.g. 'c' and 'C' count as the same letter.
