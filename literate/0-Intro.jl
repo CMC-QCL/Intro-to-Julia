@@ -217,7 +217,7 @@ methodswith(QR) # look up functions defined on the QR type
 using LinearAlgebra
 X = randn(10, 3) # naive simulation for least squares problem...
 y = randn(10)
-λ = 2.0          # ridge penalty parameter
+λ = 2.0          # type \lambda → Tab to get λ symbol
 
 β = inv(X'X + λ*I) * X' *y # ridge regression solution
 
