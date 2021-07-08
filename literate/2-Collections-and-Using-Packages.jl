@@ -792,6 +792,8 @@ test1 = "heterogeneous"
 #-
 test2 = "Alcatraz"
 
+# # BREAK! (10 minutes)
+
 # # Convenient Syntax Tools
 
 # ### Higher-Order Functions, Transformations, and Broadcasting
