@@ -2,244 +2,23 @@
 
 # # Overview
 #
-# 1. Anatomy of Julia Functions and Types (10 min)
-# 3. Collections (40 min)
+# 1. Collections (? min)
 #    - Arrays
 #    - Ranges
 #    - (Named) Tuples
 #    - Dictionaries
-# 4. Convenient Syntax Tools (10 min)
-# 5. Variable Scope (10 min)
-# 6. Packages: Using other people's code (10 min)
+# 2. Convenient Syntax Tools (? min)
+# 3. Variable Scope (? min)
+# 4. Packages: Using other people's code (? min)
 #    - Modules
 #    - The Standard Library
 #    - The General Registry
 #    - Environments
-# 7. Review with an Example: Multiple Regression (20 min)
-
-# # Anatomy of Julia Functions and Types
-#
-# This introductory section expands on functions and introduces types.
-# Here we will focus on introducing a few basic concepts that will help us understand collections and other objects in Julia.
-#
-# ### Functions
-#
-# A general Julia function has the following structure
-#
-# ```julia
-# function function_name(a, b, A=value1, B=value2; kA=default_value1, kB=default_value2)
-#   # body
-# end
-# ```
-#
-# The first two arguments in the signature, `a` and `b`, are what we are used to seeing so far: they're just inputs supplied by the caller.
-#
-# The second set of inputs, `A` and `B`, are *optional positional arguments*.
-# If the positional argument is not supplied, then the defaults `value1` and `value2` are used.
-# The ordering matters: positonal arguments must be specified from left to right.
-#
-# The last set of inputs, after the semicolon `;`, are *optional keyword arguments*.
-# Like positional arguments, keyword arguments have default values.
-# The difference is that the caller must specify the inputs using key-value pairs.
-
-x = rand(1:100, 10)
-#-
-sort!(x, rev=false) # orders based on < operator by default
-#-
-sort!(x, rev=true)
-
-# Lastly, there is an important distinction to make between a *function* and a *method*.
-# In defining a function one can restrict the types of arguments using type annotations (more in the next section).
-# Any time you specify the types of arguments, you are explicitly defining a *method* for that function.
-# **Unlike OO languages, methods belong to functions and not classes/types.**
-# This final point is the key to understanding multiple dispatch:
-
-h(x, y, z) = (x, y, z, "GENERIC") # no specialization
-h(x::T, y::T, z::T) where T = (x, y, z, "Specialize on common type $(T)") # specific case
-h(x::Char, y::Char, z::Char) = (x, y, z, "Specialize on Char x,y,z") # more specific case
-#-
-h(1.0, 1, 'a')
-#-
-h(1, 2, 3)
-#-
-h('a', 'b', 'c')
-
-# ### Types
-#
-# The type system in Julia is a mix between static and dynamic:
-#
-# - you can write all your code without ever talking about types (dynamic).
-# - you can enforce types to help the reader, to use multiple dispatch, or to help the Julia compiler infer type information (static).
-#
-# Enforcing types is done with the double colon operator `::`.
-# A few examples:
-
-x::Int = 1 # create a varible x which must be an Int
-#-
-function myadd(x::Int, y::Int) # define the function only on Int arguments
-    return x + y
-end
-
-# Everything in Julia has a type, even types!
-
-@show typeof(1.0)
-@show typeof(typeof(1.0))
-
-# `DataType` and `Any` are special types.
-# Every explicitly declared type is a `DataType`, whereas `Any` describes the entire universe of possible values; i.e. it is the union of every type.
-
-# ### Exercise 2.1
-#
-# This exercise will walk you through some of the syntax in constructing types and how they work in Julia.
-
-# Our goal is to implement a type that represents a point in 2D space which supports addition.
-# First, we'll define a "top-level" type, an abstract type.
-abstract type AbstractPoint end
-
-# Abstract types cannot have fields.
-# However, you're allowed to define functions on them.
-
-# Types cannot "inherit" from other types, but you can *subtype* them to put them in a hierarchy.
-# The syntax
-#
-# ```julia
-# A <: B # <: is the subtyping operator
-# ```
-#
-# means that `A` is a subtype of `B`.
-# Now let's implement a concrete type in our point hierarchy.
-# We'll use an immutable composite type and make the fields be `Float64`.
-# This is done with the `struct` keyword.
-#
-# **Add a subtyping annotation to the following type to make `Point2D` belong to the `AbstractPoint` hierarchy.**
-# That is, `Point2D <: AbstractPoint`.
-
-struct Point2D # missing subtyping goes here!
-    x::Float64 # field called `x` of type `Float64`
-    y::Float64
-end
-#-
-Point2D(1.0, 1.0) # Julia automatically defines a default constructor.
-#-
-Point2D(1, 1) # Notices that conversion is handled automatically; errors if not possible.
-
-# Let's make a mutable version now.
-#
-# **Add a `mutable` keyword to the left of `struct`.**
-
-struct MutablePoint2D <: AbstractPoint
-    x::Float64
-    y::Float64
-end
-#-
-MutablePoint2D(1, 1) # this works
-
-# Both our concrete types have fields `x` and `y`.
-# If we didn't already know this, we could ask with the `fieldnames` function.
-
-fieldnames(Point2D)
-#-
-fieldnames(MutablePoint2D)
-
-# There is a similar function `fieldtypes` that returns field types.
-# *Accessing* fields is done with the familiar dot `.` syntax, `obj.field`.
-
-# **Try making the fields of `mymutablepoint` match `mypoint`, and vice-versa**.
-# For example, `mypoint.x` below would return the value of field `x`.
-# Do this without creating a new instance.
-
-mypoint = Point2D(1.5, 1.1)
-mymutablepoint = MutablePoint2D(0, 0)
-## your code goes here
-
-# Finally, let's make a parametric version, which defines a *family* of types.
-# In our case, we will allow `x` and `y` to be of any type, so long as it is a real number.
-#
-# **Add the code `{T <: Real}` right next to `ParPoint2D` below to make the type parameteric.**
-
-struct ParPoint2D#= parameters go here =# <: AbstractPoint
-    x::T
-    y::T
-end
-#-
-ParPoint2D(1, 1) # what's the type parameter here?
-#-
-ParPoint2D(1.0, 1.0)
-#-
-ParPoint2D(1, 1.0)
-#-
-ParPoint2D{Int8}(0, 0) # force the type parameter
-
-# Now let's define addition on our objects with a *parametric function* to define the function only on our types.
-# The symbol `T` is declared as a free type parameter in the function, and can be used in the function body.
-#
-# **Fill in the missing code below.**
-
-function add_points(a::T, b::T) where T <: AbstractPoint
-    ## create two variables here, xcoord and ycoord
-    ## representing the x and y coordinates for the new point
-
-    return T(xcoord, ycoord) # create an instance with the correct coordinates
-end
-
-# **Practice testing the addition function we wrote with different types.**
-
-## Add Point2D objects
-x = # Point2D
-y = # Point2D
-add_points(x, y)
-#-
-## Add MutablePoint2D
-x = # MutablePoint2D
-y = # MutablePoint2D
-add_points(x, y)
-#-
-## Add ParPoint2D
-x = # ParPoint2D
-y = # ParPoint2D
-add_points(x, y)
-#-
-## What happens if we mix them?
-x = Point2D(0, 0)
-y = ParPoint2D(1, 10)
-add_points(x, y)
-
-# The last example fails because *we never defined addition over different subtypes of `AbstractPoint`.
-# However, Julia tries to determine a potential source of the issue and highlights them in red.
-#
-# Paradoxically, type annotations in Julia make code *less* generic?
-# This may be confusing to newcomers from OO languages.
-#
-# The function signature
-# ```julia
-# add_points(x::T, y::T) where T <: AbstractPoint
-# ```
-# is quite specific and applies generically to concrete types in the `AbstractPoint` hierarchy **of the same kind**.
-#
-# So how do we resolve the paradox?
-# Just say that the arguments have to be `AbstractPoint`s.
-# We'll default to using the left argument's type for the output.
-
-function add_points(a::AbstractPoint, b::AbstractPoint)
-  T = typeof(a) # use the type of a
-  return T(a.x + b.x, a.y + b.y)
-end
-
-# Go back to the cells above and try running them again.
-# Why does this work? Julia's design makes it so that it determines the most applicable method to use based on the actual types (multiple dispatch in action).
-
-# **Takeaways**:
-#
-# - Functions can have optional arguments.
-# - You can ask about fields in an object with `fieldnames` and access them with `obj.field` syntax.
-# - Types can be mutable or immutable.
-# - Functions and types can be parameteric.
-#
-# Use this information to help you understand Julia documentation and error messages.
+# 5. Review with an Example: Multiple Regression (? min)
 
 # # Collections
 #
-# Roughly speaking, a *collection* is simply an object that stores multiple objects; e.g. an object that stores multiple literals.
+# A *collection* is an object that stores other objects; e.g. an object that stores multiple `Int`s.
 # Collections can be nested within each other, so it is possible to have an `Array` of `Array`s or a `Dict` of `NamedTuple` objects.
 #
 # Before diving into specific kinds of collections, it is good to be aware that collections share a lot of behavior, so much that Julia defines [interfaces](https://docs.julialang.org/en/v1/manual/interfaces/).
@@ -317,7 +96,7 @@ Matrix{Int}(undef, (2, 2))
 #-
 Array{String}(undef, 2, 2, 3)
 
-# ### Exercise 2.2
+# ### Exercise 2.1
 #
 # Look up `Array`, and the initializers `undef`, `nothing`, and `missing` in the documentation.
 #
@@ -404,7 +183,7 @@ x[ [false, true, false] ] == ['b'] # Booleans can be used to subset too
 #-
 x[ x .== 'b' ] # select subset based on a condition; .== is element-wise equality 
 
-# ### Exercise 2.3
+# ### Exercise 2.2
 #
 # Practice indexing by trying to construct the following sequences of letters with indexing.
 # In each case, your solution should be a vector.
@@ -440,19 +219,7 @@ x = exercise_2_2() # this function creates an array for the exercise
 # **abcdefg**
 ##
 
-# Arrays are *mutable* objects, meaning it is possible to change contents.
-# This is done by combining indexing with assignment syntax.
-
-x = [0, 0, 0]
-x[1] = 1
-x[2] = 2
-x[3] = 3
-x
-
-# This generalizes to multidimensional arrays and coordinate indexing.
-# Later, we will see how to change several locations in an array at once.
-
-# ### Exercise 2.4
+# ### Exercise 2.3
 #
 # Look up the following functions:
 # 
@@ -471,7 +238,7 @@ x = rand(10, 2, 3);
 #-
 ## test functions here or add your own cells
 
-# ### Exercise 2.5
+# ### Exercise 2.4
 #
 # This exercise demonstrates how the order of iteration over matrices impacts performance.
 #
@@ -504,14 +271,31 @@ function iterate_i_then_j(matrix)
     end
     return max_val
 end
+#-
+## call one function here
+#-
+## call the other function here
 
-# ### Exercise 2.6
+# #### Mutability
+#
+# Arrays are *mutable* objects, meaning it is possible to change contents.
+# This is done by combining indexing with assignment syntax.
+
+x = [0, 0, 0]
+x[1] = 1
+x[2] = 2
+x[3] = 3
+x
+
+# This generalizes to multidimensional arrays and coordinate indexing.
+# Later, we will see how to change several locations in an array at once.
+
+# ### Exercise 2.5
 #
 # Write a function that fills a vector with the numbers $1, 2, \ldots, n$, where $n$ is the length of the given array.
 #
-# - The input to your function should be the array.
-# - Look up how to retrieve the length of an array.
-# - Your function should return the array.
+# - The input to your function should be an array which stores each item.
+# - Your function should return the modified array.
 # - Call your function `consecutive_integers!`.
 
 ## your solution goes here
@@ -530,7 +314,7 @@ consecutive_integers!(x) == Int64[1, 2, 3, 4, 5]
 # When you pass an argument to a function, say `x`, its value is bound to a new variable
 # which appears inside; for example, in the function
 #
-# ```
+# ```julia
 # function example(internal_name)
 #   # code in here...
 # end
@@ -552,7 +336,7 @@ consecutive_integers!(x) == Int64[1, 2, 3, 4, 5]
 #   - the object that is mutated should be returned (with exceptions), and
 #   - a function that allocates memory should be split into one that sets up data and then mutates the allocated objects.
 
-# ### Exercise 2.7
+# ### Exercise 2.6
 #
 # This is an exercise in practicing the Julia conventions above.
 # Write a function called `consecutive_integers` that creates an array containing integers between `1` and `n`.
@@ -571,7 +355,7 @@ consecutive_integers(1) == Int[1]
 #-
 consecutive_integers(5) == Int[1, 2, 3, 4, 5]
 
-# ### Exercise 2.8
+# ### Exercise 2.7
 #
 # Implement a function called `set_union` that returns the *union* of two vectors `x` and `y`.
 #
@@ -652,11 +436,37 @@ view(X, 1, :) # select column 2
 #-
 @view X[:, 1] # use with the usual syntax
 
+# #### Basic Linear Algebra
+#
+# Numerical arrays support basic algebraic operations by default.
+# These include: `+`, `-`, `*`, `\`, `/`, and `'`.
+# Julia will error if two arrays do not have compatible dimensions.
+
+x = [1, 2, 3]
+#-
+y = 2 * ones(3)
+#-
+x + y
+
+# Note that `x * y` is not defined. For element-wise operations (more on *broadcasting* later), add a `.` before the operator:
+
+x .* y
+
+# For the "dot product" you can write `x' * y`.
+
+x' * y
+
+# Accessing the documentation for linear algebra operations requires loading the LinearAlgebra package (more packages later)
+
+using LinearAlgebra
+#-
+?LinearAlgebra
+
 # ### Ranges
 
 # Range objects are used to lazily represent a collection of ordered values, such as intervals.
 # All range objects support indexing and some notion of length.
-# In Part I we covered `UnitRange` (e.g. `1:10`) and `StepRange` (e.g. `1:1:10`), which work on mainly on integer types.
+# In Part I we covered `UnitRange` (e.g. `1:10`) and `StepRange` (e.g. `1:1:10`), which work mainly on integer types.
 # Only `UnitRange` generalizes to real numbers but require using an explicit constructor rather than the shorthand with colons.
 # Below are a few examples.
 
@@ -702,9 +512,9 @@ collect(range(0.0, 10.0, step=0.1))
 # They are created by separating values with commas `,`.
 # Sometimes it is useful to add parantheses to make it clear that an object is a `Tuple`.
 
-1, 2, 3
+x = 1, 2, 3
 #-
-(1, 2, 3)
+x = (1, 2, 3)
 
 # Tuples support both *indexing*, and *iteration*.
 
@@ -720,13 +530,16 @@ end
 
 x[2] = 100
 
+# In addition, a `Tuple` has a length which is a fixed property of the object.
+length(x)
+
 # So why would you use `Tuple`?
 
-# 1. You want to return multiple values in a function.
+# 1. You want to *pass* or *return* multiple values in a function.
 # 2. You want to represent a collection of heterogeneous elements.
 # 3. You want the collection to be immutable (e.g. for use in functional programming style).
 
-# ### Exercise 2.9
+# ### Exercise 2.8
 #
 # The `Tuple` type is quite important in Julia because it allows one to "destructure" multiple return values.
 # Below are three functions that return multiple values using a mix of `Array` and `Tuple`.
@@ -758,6 +571,24 @@ nt.b
 #-
 nt.c
 
+# ### Exercise 2.9
+#
+# Both `Tuple` and `NamedTuple` are useful in passing around multiple arguments to functions that accept variable length arguments.
+# The "splat" operator `...` can be used to expand the contents of a tuple object into the arguments of a function.
+
+x = (1,2,3,4,5)
+sum(x) == +(x...) # splat x into +; expands to 1 + 2 + 3 + 4 + 5
+
+# **Write a function `f(x,y)` that computes `x + y`**.
+
+## your code goes here
+
+# **Now try calling `f(x...)` where `x` is a `Tuple` with two numbers.**
+
+## try splatting here
+
+# Later we will revisit splatting with `NamedTuple` in plotting.
+
 # ### Dictionaries
 
 # A [`Dict`](https://docs.julialang.org/en/v1/base/collections/#Dictionaries) in Julia is an object that maps a specific *key* to a unique *value* (key-value pairs).
@@ -781,7 +612,7 @@ end
 
 # ### Exercise 2.10
 #
-# Write a function that counts the number of each character in a `String`, storing the result in a dictionary.
+# Write a function that counts the number instances of each character in a `String`, storing the result in a dictionary.
 # Remember that `String` objects are iterable.
 # 
 # **Hint**: Calling `d['a']` should return the number of instances of the letter `a` in the given string. 
@@ -814,9 +645,41 @@ result = Vector{Float64}(undef, 10)
 #-
 map!(sqrt, result, input)
 
+# Sometimes you want to `map` a collection but the transformation you need requires multiple arguments. How can you handle this in Julia?
+
+# **With anonymous functions**
+#
+# The syntax `x -> f(x)` defines an unnamed (hence anonymous) function. The key here is the `->` operator. These are useful for "fixing" arguments in a multi-argument function call
+
+x = [-1, 32, 4, 8, -12, 0]
+map(arg -> arg > 0, x)
+
+# **With specialized types**
+#
+# Some functions like `>`, `isequal`, and `occursin` can be called with a single argument, which generates a `Fix2` object.
+# This object behaves exactly like a function, except it "fixes" one argument in a function call.
+
+is_greater_than_zero = >(0)
+#-
+is_greater_than_zero(10)
+
+# ### Exercise 2.11
+#
+# Try using the concepts above to search for the specified elements.
+# Hint: functions to look up: `findall`, `contains`, `occursin`, `filter`.
+
+# **Positive elements of the following array:**
+test_arr = randn(10) # generates 10 random elements that are normally distributed about 0 with variance 1
+#-
+## your solution
+
+# **File names ending with the `.out` extension:**
+include("misc/exercise-2-2.jl")
+files = exercise_2_12()
+
 # In many dynamic languages it is common to write complex mathematical expressions in "vectorized" form. Often, this is because loops in the language are inherently slow, or the vectorized code hooks into specialized routines that run faster than a naive implementation.
 #
-# Julia provides *broadcasting* for performing element-wise operations (although loops are fast and can be made fast).
+# Julia provides *broadcasting* for performing element-wise operations (although loops are a fast language feature).
 #
 # To start, common mathematical and logical operators can be broadcast by adding a `.` before the operator:
 
@@ -862,21 +725,15 @@ X
 
 # ### Comprehensions and Generators
 
-# Sometimes we have a simple rule to enumerate the members of the collection, and it is convenient to specify that collection compactly.
-# For example, in mathematics one can specify the integers $1,2,\ldots,10$ using set builder notation
-#
-# $$
-# \{i : \in \mathrm{Z},~1 \le i \le 10\}
-# $$
-#
+# Sometimes we have a simple rule to enumerate the members of the collection, and it is convenient to specify that collection compactly in set builder-like notation.
 # Julia has two language constructs that implement this sort of notation, *generators* and *comprehensions*.
 
 # A *generator* in Julia is a construct that lazily generates a sequence of values, meaning you don't create and store the values.
 # Rather, you wait until you iterate over the object to acces specific values.
 # Here is an example:
 
-itr = (i for i in 1:10) # produce the values; cannot index into this
-for val in itr # iterate and do something
+itr = (i for i in 1:10) # produce the values; cannot index into this object
+for val in itr # iterate and consume the sequence
     @show val
 end
 
@@ -903,6 +760,22 @@ x = [ i for i in 1:4 ]
 y = [ i^2 for i in 1:4 ]
 #-
 z = [ string("x", i) for i in 1:4 ]
+
+# ### Exercise 2.12
+#
+# The exponential growth model, $G(t) = G(0) \times e^{rt}$, is used in many disciplines to describe populations in a rapid proliferation phase.
+# Here $G(0)$ is the initial population size and $r$ is the population growth rate.
+#
+# **Implement the mathematical model $G(t)$ in a function.**
+# Your implementation should be sufficiently general that you can use HoFs, broadcasting, and/or comprehensions to evaluate $G(t)$ at different time points $t$, different initial sizes $G(0)$, and different growth rates $r$.
+
+## your solution
+
+# *Trajectory over time for a particular $G(0)$ and $r$.*
+ts = range(0.0, 2.0, step=0.02)
+r = 1.0
+G0 = 100.0
+G.(ts, r, G0)
 
 # # Variable Scope
 #
@@ -1099,13 +972,13 @@ helloworld()
 
 # Yet another option: You can explicitly choose which functions to bring into scope when you ivoke `using`:
 
-using LinearAlgebra: norm # only bring norm into scope, unqualified
-norm(rand(3))
+using Statistics: mean # only bring mean into scope, unqualified
+mean(rand(100))
 #-
-eigen # lives in LinearAlgebra
+median # lives in Statistics
 #-
-using LinearAlgebra
-eigen
+using Statistics
+median
 
 # #### A word on documentation
 #
@@ -1119,6 +992,8 @@ end
 ?docstring_test
 
 # [Docstrings](https://docs.julialang.org/en/v1/manual/documentation/) can use Markdown, LaTeX, and have their own style and formatting rules.
+
+# **Another useful tip:** The function `varinfo` (provided by the Standard Library package InteractiveUtils) can be used to check what variables are defined in a particular module.
 
 # ### The Standard Library
 
@@ -1151,11 +1026,77 @@ end
 #
 # and many, many more.
 
+# ### Exercise 2.13
+#
+# The [Plots](http://docs.juliaplots.org/latest/) package is an interface to different plotting backends in Julia.
+#
+# - It provides high-level interfaces like `plot`, `scatter`, `histogram`, and so on.
+# - The implementation details are handled by other packages; for example GR, PyPlot, Plotly.
+# - The default backend is GR.
+# - Switching backends can be done interactively; for example, calling `gr()` switches to GR.
+#
+# Here we'll practice using a few plotting commands.
+
+# **Load the Plots package.**
+##
+
+# **Run the following code cell.** Note that *keyword arguments* are used to specify plot options.
+xs = range(0.0, 1.0, step=0.1)
+ys = exp.(xs)
+plot(xs, ys, xlabel="x", ylabel="exp(x)")
+
+# Try making the same plot using the `scatter` command.
+##
+
+# Plot both the lines and a marker at each point by specifying the option `marker=:o`.
+##
+
+# If you pass a single `Array` argument to `plot`, indices are used as the x-axis. **Plot just `ys` with a single command**.
+##
+
+# You can plot single-argument functions directly. **Try calling the `plot` command with the function `exp` instead of `y`.**
+##
+
+# To plot multiple functions, put them in an `Array`. **Plot both `cos` and `sin` with a single plot command.**
+##
+
+# You can build plots incrementally by using the `!` versions of functions. **Plot `cos` and `sin` with two plot commands**.
+##
+
+# Plots will interpret *columns* of a matrix as different series.
+xs = range(0.0, 1.0, length=101)
+ys = randn(length(xs), 3) # 101 time points by 3 series
+plot(xs, ys)
+
 # ### Environments
 
 # The list of explicitly installed packages is stored in a file called `Project.toml`.
 # The *main* environment is usually called `@v1.x` where `x` is the minor Julia version and lives in `~/.julia/environments/v1.x`.
 # This is important because it helps you reproduce the environment used in developing a project!
+# 
+# There is another file, `Manifest.toml`, which contains specific details about package versions and other dependencies.
+#
+# Both `Project.toml` and `Manifest.toml` are important for managing your own Julia installation, developing your own packages, and making your programs reproducible when sharing code.
+
+# ##### High-level summary
+#
+# **If you want to add a package to your computing environment for daily use:**
+#
+# - No need to worry about `Project.toml` or `Manifest.toml`; just `]add` whatever you want!
+# - If you run into bugs and want to get help online/report a bug, you may be asked to supply both files.
+#
+# **If you want to write code for a (research) project:**
+#
+# - You should track the computing environment used in a `Project.toml` **and** `Manifest.toml` to make your results reproducible.
+# - Ideally, anyone that wants to recreate your studies can just `]activate <environment>`, `]resolve` dependecies, and then `]instantiate` the specific dependencies required.
+#
+# **If you want to develop your own code:**
+#
+# - You'll want to write and test within your package's own environment.
+# - Track dependencies in `Project.toml` and be mindful of what versions you're using when developing code.
+# - Ideally keep `Project.toml` under version control.
+# - `Manifest.toml` not required; end-user will have different dependencies.
+
 
 # # Review with an Example: Multiple Regression
 #
@@ -1163,16 +1104,19 @@ end
 # We will walk through an algorithm to fit a linear model in the context of multiple regression:
 #
 # $$
-# y_{i} \sim \beta_{0} + x_{i1} \beta_{1} + x_{i2} \beta_{2} + \ldots x_{ip} \beta_{p},
+# y_{i} \sim x_{i1} \beta_{1} + x_{i2} \beta_{2} + \ldots x_{ip} \beta_{p} + \beta_{p+1},
 # $$
 #
 # where
 #
 # - $y_{i}$ is the $i$th sample of a dependent variable (what we want our model to be able to predict)
-# - $x_{ij}$ is the $i$th sample of predictor $j$, and
-# - $\beta_{j}$ is the effect size of predictor $j$ (roughly how much a predictor influences the dependent variable).
+# - $x_{ij}$ is the $i$th sample of predictor $j$,
+# - $\beta_{j}$ is the effect size of predictor $j$ (roughly how much a predictor influences the dependent variable), and
+# - $\beta_{p+1}$ is an intercept term that captures the ``mean effect'' in the data.
+#
+# **For the purposes of this extended example, we will simply think of multiple regression as a technique to make predictions from data. No theory is required.**
 
-# ### Exercise 2.11
+# ### Exercise 2.14
 #
 # Complete the following function by
 #
@@ -1214,7 +1158,7 @@ X[:,end] # should be 1s
 #-
 β[3], β[5], β[8] # should be "large" in magnitude
 
-# ### Exercise 2.12
+# ### Exercise 2.15
 #
 # Now we're going to use the Plots package to visualize our simulated data.
 #
@@ -1222,15 +1166,15 @@ X[:,end] # should be 1s
 
 ## your solution
 
-# 2. Use the `scatter` function to plot a particular predictor `X[:,j]` on the x-axis and `y`. This function takes two arguments, `scatter(xaxis_values, yaxis_values)`. **You should only see a trend for `j = 3, 5, 8`.**
+# 2. Use the `scatter` function to plot a particular predictor `X[:,j]` on the x-axis and `y` on the y-axis. This function takes two arguments, `scatter(xaxis_values, yaxis_values)`. **You should only see a "strong" trend for `j = 3, 5, 8`.**
 
 ## your solution
 
-# 3. Add labels to both axes using the `xlabel` and `ylabel` keywords to `scatter`. The x-axis should read "independent variable" and the y-axis should be "dependent variable".
+# 3. Using your previous code, add labels to both axes using the `xlabel` and `ylabel` keywords to `scatter`. The x-axis should read "independent variable" and the y-axis should be "dependent variable".
 
 ## your solution
 
-# ### Exercise 2.13
+# ### Exercise 2.16
 #
 # Now we'll use the DataFrames and Statistics packages to do some descriptive statistics.
 # Here we will simply run the existing code cells.
@@ -1254,15 +1198,15 @@ describe(df)
 
 ## your solution
 
-# ### Exercise 2.14
+# ### Exercise 2.17
 #
 # Complete the function below which creates an object to represent our problem.
 #
 # First, load the LinearAlgebra package and search the help system for how to compute the singular value decomposition (SVD) $\boldsymbol{X} = \boldsymbol{U} \boldsymbol{S} \boldsymbol{V}^{\top}$.
 # Then complete the following:
 #
-# 1. Allocate a vector `β` that has the same length as the number of columns as `X`.
-# 2. Create three variables `U`, `s`, and `V` which store the SVD of a matrix `X`.
+# 1. Create three variables `U`, `s`, and `V` which store the SVD of a matrix `X`.
+# 2. Allocate a vector `β` that has the same length as the number of columns as `X`.
 # 3. Put the variables `y`, `X`, `U`, `s`, `V`, and `β` into a `NamedTuple` with the same field names. Call it `problem`.
 
 ## First, load the LinearAlgebra package
@@ -1282,7 +1226,7 @@ end
 # One way to solve the regression problem is to minimize the least squares criterion
 #
 # $$
-# \sum_{i=1}^{n} (y_{i} - \sum_{j=0}^{p} x_{ij} \beta_{j})^{2},
+# \sum_{i=1}^{n} \left[y_{i} - \sum_{j=1}^{p} x_{ij} \beta_{j} - \beta_{p+1}\right]^{2},
 # $$
 #
 # that is, the distance between the observed values $y$ and the model's predictions $X \beta$.
@@ -1293,8 +1237,12 @@ end
 # $$
 # \beta = \sum_{j} \frac{s_{j}}{s_{j}^{2} + \lambda} \boldsymbol{u}_{j}^{\top} \boldsymbol{y} \boldsymbol{v}_{j}.
 # $$
+#
+# Here the notation $\boldsymbol{u}^{\top} \boldsymbol{v} = u_{1} v_{1} + u_{2} v_{2} + \ldots + u_{n} v_{n}$ represents the "dot product" or "inner product" between two vectors of equal length.
+# In Julia you can compute these quantities using `u' * v`, where `'` is the adjoint (transpose for real numbers).
+# Another way is to use `dot(u, v)` directly.
 
-# ### Exercise 2.15
+# ### Exercise 2.18
 #
 # Let's implement a function that computes the matrix-vector product $\boldsymbol{X} \boldsymbol{β}$ from the `problem` object we created.
 #
@@ -1313,7 +1261,7 @@ function predict(problem)
     ## allocate the output array and call predict!
 end
 
-# ### Exercise 2.16
+# ### Exercise 2.19
 #
 #
 # Complete the function below by filling in the missing pieces:
@@ -1344,7 +1292,7 @@ function solve_regression!(problem) # 1. add positional argument
     return β
 end
 
-# ### Exercise 2.17
+# ### Exercise 2.20
 #
 # Let's use a test function to check that our implementation works.
 # We'll use the mean-squared error,
@@ -1359,7 +1307,7 @@ function mse(u, v)
     ## you solution
 end
 
-# ### Exercise 2.18
+# ### Exercise 2.21
 #
 # Now let's actually check.
 
@@ -1374,7 +1322,7 @@ mse(β, problem.β) # how well do we estimate the "true" values?
 causal_idx = [3,5,8]
 mse(β[causal_idx], problem.β[causal_idx]) # how about just the "causal" ones?
 
-# ### Exercise 2.19 (Bonus)
+# ### Exercise 2.22 (Bonus)
 #
 # Lastly, the following code will generate a plot that shows how the esimated $\beta$ changes as $\lambda$ changes.
 
@@ -1392,6 +1340,6 @@ plot(λs, βs,
     xscale=:log10,      # log transform the x-axis only
 )
 
-# 1. Using the code above as a guide, figure out how to plot the MSE between $y$ and the prediction as a funtion of $\lambda$.
-# 2. Do the same for $\beta$ and the estimated $\beta$.
+# 1. Using the code above as a guide, figure out how to plot the MSE between `y` and the prediction `X*β` as a funtion of $\lambda$.
+# 2. Do the same for `β` and the estimate `problem.β`.
 # 3. Can you turn your code into a function that handles these two cases? The original case?

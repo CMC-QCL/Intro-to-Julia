@@ -19,20 +19,19 @@
 
 ### Part II: Collections and Using Packages
 
-1. Anatomy of Julia Functions and Types
-2. Collections
+1. Collections
     - Arrays
     - Ranges
     - (Named) Tuples
     - Dictionaries
-3. Convenient Syntax Tools
-4. Variable Scope
-5. Packages: Using other people's code
+2. Convenient Syntax Tools
+3. Variable Scope
+4. Packages: Using other people's code
     - Modules
     - The Standard Library
     - The General Registry
     - Environments
-6. Review with an Example: Multiple Regression
+5. Review with an Example: Multiple Regression
 
 </details>
 
